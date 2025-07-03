@@ -34,22 +34,22 @@ export function useRiveCharacter(containerRef: RefObject<HTMLDivElement>) {
         containerRef.current.appendChild(canvas);
         setCanvas(canvas);
 
-        // Initialize Rive with a working sample file
+        // Initialize Rive with user's character file
         riveInstance = new Rive({
-          src: 'https://cdn.rive.app/animations/vehicles.riv', // Using a working sample file
+          src: '/animations/voice_agent_character.riv', // User's character file
           canvas: canvas,
           layout: new Layout({
             fit: Fit.Contain,
             alignment: Alignment.Center,
           }),
-          stateMachines: 'bumpy_car',
+          stateMachines: 'Character_State_Machine',
           onLoad: () => {
             console.log('Rive character loaded');
-            stateMachine = riveInstance.stateMachineInputs('bumpy_car');
+            stateMachine = riveInstance.stateMachineInputs('Character_State_Machine');
           },
           onLoadError: (error: any) => {
             console.error('Failed to load Rive character:', error);
-            // Fall back to placeholder
+            // Fall back to placeholder - SVG character will be shown instead
           }
         });
 

@@ -89,7 +89,15 @@ This is a full-stack voice agent application that enables real-time voice conver
 ## Changelog
 
 Changelog:
-- July 03, 2025. Initial setup
+- July 03, 2025: Initial setup
+- July 03, 2025: Built complete voice agent application with:
+  - ElevenLabs conversational AI integration with real API keys
+  - Animated SVG character with emotional expressions and lip sync
+  - Rive animation support ready for custom character files
+  - Real-time WebSocket communication for voice data
+  - Modern dark theme with purple/blue gradients
+  - Voice activity detection and visual feedback
+  - Conversation history and message storage
 
 ## User Preferences
 

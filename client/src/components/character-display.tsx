@@ -1,4 +1,5 @@
-import { useMemo } from "react";
+import { useMemo, useRef, useEffect } from "react";
+import { useRiveCharacter } from "@/hooks/use-rive-character";
 
 interface CharacterDisplayProps {
   isSpeaking: boolean;
@@ -13,7 +14,27 @@ export function CharacterDisplay({
   voiceActivity, 
   emotionalState 
 }: CharacterDisplayProps) {
-  // Calculate mouth animation based on voice activity
+  const containerRef = useRef<HTMLDivElement>(null);
+  const { canvas, setRiveState } = useRiveCharacter(containerRef);
+
+  // Update Rive state when props change
+  useEffect(() => {
+    setRiveState('speaking', isSpeaking);
+  }, [isSpeaking, setRiveState]);
+
+  useEffect(() => {
+    setRiveState('listening', isListening);
+  }, [isListening, setRiveState]);
+
+  useEffect(() => {
+    setRiveState('voiceActivity', voiceActivity);
+  }, [voiceActivity, setRiveState]);
+
+  useEffect(() => {
+    setRiveState('emotion', emotionalState);
+  }, [emotionalState, setRiveState]);
+
+  // Calculate mouth animation based on voice activity for SVG fallback
   const mouthScale = useMemo(() => {
     if (isSpeaking) {
       return 1 + (voiceActivity * 0.3); // Scale mouth based on voice activity
@@ -21,7 +42,7 @@ export function CharacterDisplay({
     return 1;
   }, [isSpeaking, voiceActivity]);
 
-  // Calculate eye expressions based on emotional state
+  // Calculate eye expressions based on emotional state for SVG fallback
   const eyeExpression = useMemo(() => {
     switch (emotionalState) {
       case 'happy':
@@ -37,87 +58,93 @@ export function CharacterDisplay({
 
   return (
     <div className="relative z-10 w-80 h-80 md:w-96 md:h-96 flex items-center justify-center">
-      {/* Main Character */}
-      <div className="w-64 h-64 md:w-80 md:h-80 rounded-full overflow-hidden border-4 border-primary/30 relative bg-gradient-to-br from-primary/10 to-secondary/10">
-        <svg 
-          className="w-full h-full" 
-          viewBox="0 0 200 200" 
-          fill="none" 
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          {/* Background gradient */}
-          <defs>
-            <radialGradient id="faceGradient" cx="50%" cy="40%" r="60%">
-              <stop offset="0%" stopColor="hsl(231, 83%, 84%)" />
-              <stop offset="100%" stopColor="hsl(231, 83%, 64%)" />
-            </radialGradient>
-            <linearGradient id="eyeGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="hsl(210, 40%, 20%)" />
-              <stop offset="100%" stopColor="hsl(210, 40%, 10%)" />
-            </linearGradient>
-          </defs>
-          
-          {/* Face */}
-          <circle cx="100" cy="100" r="90" fill="url(#faceGradient)" />
-          
-          {/* Eyes */}
-          <g transform={`translate(0, ${eyeExpression.offsetY})`}>
-            <ellipse 
-              cx="75" 
-              cy="80" 
-              rx="8" 
-              ry={12 * eyeExpression.scaleY}
-              fill="url(#eyeGradient)"
-              className={isListening ? 'animate-pulse' : ''}
-            />
-            <ellipse 
-              cx="125" 
-              cy="80" 
-              rx="8" 
-              ry={12 * eyeExpression.scaleY}
-              fill="url(#eyeGradient)"
-              className={isListening ? 'animate-pulse' : ''}
-            />
+      {/* Rive Character Container */}
+      <div 
+        ref={containerRef}
+        className="w-64 h-64 md:w-80 md:h-80 rounded-full overflow-hidden border-4 border-primary/30 relative bg-gradient-to-br from-primary/10 to-secondary/10"
+      >
+        {/* SVG Fallback Character (shown when Rive is not available) */}
+        {!canvas && (
+          <svg 
+            className="w-full h-full" 
+            viewBox="0 0 200 200" 
+            fill="none" 
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            {/* Background gradient */}
+            <defs>
+              <radialGradient id="faceGradient" cx="50%" cy="40%" r="60%">
+                <stop offset="0%" stopColor="hsl(231, 83%, 84%)" />
+                <stop offset="100%" stopColor="hsl(231, 83%, 64%)" />
+              </radialGradient>
+              <linearGradient id="eyeGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="hsl(210, 40%, 20%)" />
+                <stop offset="100%" stopColor="hsl(210, 40%, 10%)" />
+              </linearGradient>
+            </defs>
             
-            {/* Eye highlights */}
-            <circle cx="77" cy="76" r="2" fill="hsl(210, 40%, 90%)" opacity="0.8" />
-            <circle cx="127" cy="76" r="2" fill="hsl(210, 40%, 90%)" opacity="0.8" />
-          </g>
-          
-          {/* Mouth */}
-          <g transform={`translate(100, 130) scale(${mouthScale})`}>
-            {isSpeaking ? (
-              // Speaking mouth (oval)
+            {/* Face */}
+            <circle cx="100" cy="100" r="90" fill="url(#faceGradient)" />
+            
+            {/* Eyes */}
+            <g transform={`translate(0, ${eyeExpression.offsetY})`}>
               <ellipse 
-                cx="0" 
-                cy="0" 
-                rx="12" 
-                ry="8" 
-                fill="hsl(210, 40%, 10%)" 
-                className="animate-speak"
+                cx="75" 
+                cy="80" 
+                rx="8" 
+                ry={12 * eyeExpression.scaleY}
+                fill="url(#eyeGradient)"
+                className={isListening ? 'animate-pulse' : ''}
               />
-            ) : (
-              // Resting mouth (line)
-              <line 
-                x1="-8" 
-                y1="0" 
-                x2="8" 
-                y2="0" 
-                stroke="hsl(210, 40%, 20%)" 
-                strokeWidth="3" 
-                strokeLinecap="round"
+              <ellipse 
+                cx="125" 
+                cy="80" 
+                rx="8" 
+                ry={12 * eyeExpression.scaleY}
+                fill="url(#eyeGradient)"
+                className={isListening ? 'animate-pulse' : ''}
               />
+              
+              {/* Eye highlights */}
+              <circle cx="77" cy="76" r="2" fill="hsl(210, 40%, 90%)" opacity="0.8" />
+              <circle cx="127" cy="76" r="2" fill="hsl(210, 40%, 90%)" opacity="0.8" />
+            </g>
+            
+            {/* Mouth */}
+            <g transform={`translate(100, 130) scale(${mouthScale})`}>
+              {isSpeaking ? (
+                // Speaking mouth (oval)
+                <ellipse 
+                  cx="0" 
+                  cy="0" 
+                  rx="12" 
+                  ry="8" 
+                  fill="hsl(210, 40%, 10%)" 
+                  className="animate-speak"
+                />
+              ) : (
+                // Resting mouth (line)
+                <line 
+                  x1="-8" 
+                  y1="0" 
+                  x2="8" 
+                  y2="0" 
+                  stroke="hsl(210, 40%, 20%)" 
+                  strokeWidth="3" 
+                  strokeLinecap="round"
+                />
+              )}
+            </g>
+            
+            {/* Cheeks (subtle glow when speaking) */}
+            {isSpeaking && (
+              <>
+                <circle cx="60" cy="110" r="8" fill="hsl(0, 70%, 80%)" opacity="0.3" className="animate-pulse" />
+                <circle cx="140" cy="110" r="8" fill="hsl(0, 70%, 80%)" opacity="0.3" className="animate-pulse" />
+              </>
             )}
-          </g>
-          
-          {/* Cheeks (subtle glow when speaking) */}
-          {isSpeaking && (
-            <>
-              <circle cx="60" cy="110" r="8" fill="hsl(0, 70%, 80%)" opacity="0.3" className="animate-pulse" />
-              <circle cx="140" cy="110" r="8" fill="hsl(0, 70%, 80%)" opacity="0.3" className="animate-pulse" />
-            </>
-          )}
-        </svg>
+          </svg>
+        )}
       </div>
       
       {/* Voice Activity Ring */}

@@ -17,7 +17,31 @@ export function useVoiceAgent() {
   const [currentConversationId, setCurrentConversationId] = useState<number | null>(null);
   
   const wsRef = useRef<WebSocket | null>(null);
-  const { startConversation, stopConversation, sendMessage } = useElevenLabsAgent();
+  const { 
+    startConversation, 
+    stopConversation, 
+    sendMessage, 
+    isConnected: elevenLabsConnected,
+    isSpeaking: elevenLabsSpeaking,
+    getInputVolume
+  } = useElevenLabsAgent();
+
+  // Use ElevenLabs speaking state
+  useEffect(() => {
+    setIsSpeaking(elevenLabsSpeaking);
+  }, [elevenLabsSpeaking]);
+
+  // Update voice activity from ElevenLabs input volume
+  useEffect(() => {
+    if (!getInputVolume) return;
+    
+    const interval = setInterval(() => {
+      const volume = getInputVolume();
+      setVoiceActivity(volume / 100); // Normalize to 0-1 range
+    }, 100); // Update 10 times per second
+
+    return () => clearInterval(interval);
+  }, [getInputVolume]);
 
   // Get messages for current conversation
   const { data: messages = [] } = useQuery<Message[]>({
