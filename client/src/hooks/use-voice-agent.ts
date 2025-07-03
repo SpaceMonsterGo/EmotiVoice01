@@ -111,9 +111,8 @@ export function useVoiceAgent() {
             setAgentStatus("Listening...");
             break;
           case 'voice_end_ack':
-            setIsRecording(false);
-            setIsProcessing(true);
-            setAgentStatus("Processing...");
+            // Recording stop is handled immediately in stopRecording function
+            // No processing state needed for real-time conversation
             break;
           case 'agent_speaking':
             setIsSpeaking(true);
@@ -180,13 +179,20 @@ export function useVoiceAgent() {
     if (!isRecording) return;
     
     try {
+      // Immediately update UI state for responsive feedback
+      setIsRecording(false);
+      setIsProcessing(false);
+      setAgentStatus("Ready to chat");
+      
       // Send WebSocket message to stop recording
       if (wsRef.current?.readyState === WebSocket.OPEN) {
         wsRef.current.send(JSON.stringify({ type: 'voice_end' }));
       }
       
-      // Stop ElevenLabs conversation
-      await stopConversation();
+      // Stop ElevenLabs conversation without awaiting (non-blocking)
+      stopConversation().catch(error => {
+        console.error('Error stopping conversation:', error);
+      });
       
     } catch (error) {
       setError(`Failed to stop recording: ${error instanceof Error ? error.message : 'Unknown error'}`);

@@ -98,6 +98,12 @@ Changelog:
   - Modern dark theme with purple/blue gradients
   - Voice activity detection and visual feedback
   - Conversation history and message storage
+- July 03, 2025: Fixed Rive integration and real-time processing:
+  - Successfully integrated user's visemes.riv file with proper binary handling
+  - Mapped state machine inputs: visemes (0-9), isTyping (boolean), emotion (0-3)
+  - Fixed UI hanging on processing screen during voice calls
+  - Implemented non-blocking voice recording stop for real-time experience
+  - Verified ElevenLabs connection and Rive character loading working correctly
 
 ## User Preferences
 
