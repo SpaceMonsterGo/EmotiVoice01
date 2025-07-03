@@ -1,24 +1,24 @@
 import { useEffect, useState, useCallback, RefObject } from "react";
 
 interface RiveState {
-  speaking: boolean;
-  listening: boolean;
+  visemes: number;
+  isTyping: boolean;
+  emotion: number;
   voiceActivity: number;
-  emotion: string;
 }
 
 export function useRiveCharacter(containerRef: RefObject<HTMLDivElement>) {
   const [canvas, setCanvas] = useState<HTMLCanvasElement | null>(null);
   const [riveState, setRiveStateInternal] = useState<RiveState>({
-    speaking: false,
-    listening: false,
-    voiceActivity: 0,
-    emotion: 'neutral'
+    visemes: 0,
+    isTyping: false,
+    emotion: 0,
+    voiceActivity: 0
   });
+  const [stateMachine, setStateMachine] = useState<any>(null);
 
   useEffect(() => {
     let riveInstance: any = null;
-    let stateMachine: any = null;
 
     const initializeRive = async () => {
       try {
@@ -36,16 +36,17 @@ export function useRiveCharacter(containerRef: RefObject<HTMLDivElement>) {
 
         // Initialize Rive with user's character file
         riveInstance = new Rive({
-          src: '/animations/voice_agent_character.riv', // User's character file
+          src: '/animations/visemes.riv', // User's character file
           canvas: canvas,
           layout: new Layout({
             fit: Fit.Contain,
             alignment: Alignment.Center,
           }),
-          stateMachines: 'Character_State_Machine',
+          stateMachines: 'State Machine 1',
           onLoad: () => {
             console.log('Rive character loaded');
-            stateMachine = riveInstance.stateMachineInputs('Character_State_Machine');
+            const sm = riveInstance.stateMachineInputs('State Machine 1');
+            setStateMachine(sm);
           },
           onLoadError: (error: any) => {
             console.error('Failed to load Rive character:', error);
@@ -75,20 +76,17 @@ export function useRiveCharacter(containerRef: RefObject<HTMLDivElement>) {
     setRiveStateInternal(prev => ({ ...prev, [key]: value }));
     
     // Update Rive state machine if available
-    // This would be implemented based on your specific Rive file structure
-    // For example:
-    // if (stateMachine) {
-    //   const input = stateMachine.find(input => input.name === key);
-    //   if (input) {
-    //     if (typeof value === 'boolean') {
-    //       input.value = value;
-    //     } else if (typeof value === 'number') {
-    //       input.value = value;
-    //     } else if (typeof value === 'string') {
-    //       input.fire(); // For trigger inputs
-    //     }
-    //   }
-    // }
+    if (stateMachine && stateMachine.length > 0) {
+      const input = stateMachine.find((input: any) => input.name === key);
+      if (input) {
+        if (typeof value === 'boolean') {
+          input.value = value;
+        } else if (typeof value === 'number') {
+          input.value = Math.round(value); // Ensure integer for visemes/emotion
+        }
+        console.log(`Updated Rive input ${key} to ${value}`);
+      }
+    }
   }, []);
 
   return {

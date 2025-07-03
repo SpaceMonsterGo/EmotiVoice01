@@ -19,20 +19,35 @@ export function CharacterDisplay({
 
   // Update Rive state when props change
   useEffect(() => {
-    setRiveState('speaking', isSpeaking);
-  }, [isSpeaking, setRiveState]);
+    // Map speaking state to isTyping (when agent is processing/speaking)
+    setRiveState('isTyping', isSpeaking || isListening);
+  }, [isSpeaking, isListening, setRiveState]);
 
   useEffect(() => {
-    setRiveState('listening', isListening);
-  }, [isListening, setRiveState]);
+    // Map voice activity to visemes (0-9 for lip sync)
+    if (isSpeaking && voiceActivity > 0.1) {
+      // Cycle through visemes based on voice activity for lip sync effect
+      const visemeIndex = Math.floor((voiceActivity * 10) % 10);
+      setRiveState('visemes', visemeIndex);
+    } else {
+      setRiveState('visemes', 0); // Closed mouth when not speaking
+    }
+  }, [isSpeaking, voiceActivity, setRiveState]);
+
+  useEffect(() => {
+    // Map emotional states to numbers (you can adjust these mappings)
+    const emotionMapping: { [key: string]: number } = {
+      'neutral': 0,
+      'happy': 1,
+      'sad': 2,
+      'excited': 3
+    };
+    setRiveState('emotion', emotionMapping[emotionalState] || 0);
+  }, [emotionalState, setRiveState]);
 
   useEffect(() => {
     setRiveState('voiceActivity', voiceActivity);
   }, [voiceActivity, setRiveState]);
-
-  useEffect(() => {
-    setRiveState('emotion', emotionalState);
-  }, [emotionalState, setRiveState]);
 
   // Calculate mouth animation based on voice activity for SVG fallback
   const mouthScale = useMemo(() => {
