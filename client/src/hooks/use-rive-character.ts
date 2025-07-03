@@ -34,25 +34,44 @@ export function useRiveCharacter(containerRef: RefObject<HTMLDivElement>) {
         containerRef.current.appendChild(canvas);
         setCanvas(canvas);
 
-        // Initialize Rive with user's character file
-        riveInstance = new Rive({
-          src: '/animations/visemes.riv', // User's character file
-          canvas: canvas,
-          layout: new Layout({
-            fit: Fit.Contain,
-            alignment: Alignment.Center,
-          }),
-          stateMachines: 'State Machine 1',
-          onLoad: () => {
-            console.log('Rive character loaded');
-            const sm = riveInstance.stateMachineInputs('State Machine 1');
-            setStateMachine(sm);
-          },
-          onLoadError: (error: any) => {
-            console.error('Failed to load Rive character:', error);
-            // Fall back to placeholder - SVG character will be shown instead
+        // Try to load the Rive file with better error handling
+        try {
+          // Import the Rive file as an asset using Vite's asset handling
+          const riveUrl = '/src/assets/visemes.riv';
+          const response = await fetch(riveUrl);
+          
+          if (!response.ok) {
+            throw new Error(`Failed to fetch Rive file: ${response.status}`);
           }
-        });
+          
+          // Get the file as an ArrayBuffer for proper binary handling
+          const buffer = await response.arrayBuffer();
+          const uint8Array = new Uint8Array(buffer);
+          
+          // Initialize Rive with the binary data
+          riveInstance = new Rive({
+            buffer: uint8Array,
+            canvas: canvas,
+            layout: new Layout({
+              fit: Fit.Contain,
+              alignment: Alignment.Center,
+            }),
+            stateMachines: 'State Machine 1',
+            onLoad: () => {
+              console.log('Rive character loaded successfully');
+              const sm = riveInstance.stateMachineInputs('State Machine 1');
+              setStateMachine(sm);
+              console.log('State machine inputs:', sm);
+            },
+            onLoadError: (error: any) => {
+              console.error('Failed to load Rive character:', error);
+              // Fall back to placeholder - SVG character will be shown instead
+            }
+          });
+        } catch (error) {
+          console.error('Error loading Rive file:', error);
+          // Fall back to SVG character
+        }
 
       } catch (error) {
         console.error('Failed to initialize Rive:', error);

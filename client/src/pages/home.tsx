@@ -5,6 +5,7 @@ import { ConversationHistory } from "@/components/conversation-history";
 import { useVoiceAgent } from "@/hooks/use-voice-agent";
 import { Button } from "@/components/ui/button";
 import { Settings, Wifi } from "lucide-react";
+import { testRiveFile } from "@/test-rive";
 
 export default function Home() {
   const {
@@ -122,6 +123,23 @@ export default function Home() {
           </div>
         </div>
       )}
+
+      {/* Debug Panel */}
+      <div className="fixed bottom-4 left-4 bg-muted/80 backdrop-blur-sm border border-border rounded-lg p-4 z-50">
+        <div className="flex items-center space-x-2">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => testRiveFile()}
+            className="text-xs"
+          >
+            Test Rive File
+          </Button>
+          <div className="text-xs text-muted-foreground">
+            Debug: Check console for results
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
