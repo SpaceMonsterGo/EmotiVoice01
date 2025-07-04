@@ -36,8 +36,8 @@ export function useRiveCharacter(containerRef: RefObject<HTMLDivElement>) {
 
         // Try to load the Rive file with better error handling
         try {
-          // Import the Rive file as an asset using Vite's asset handling
-          const riveUrl = '/src/assets/visemes.riv';
+          // Import the Rive file as an asset using Vite's asset handling with cache busting
+          const riveUrl = `/src/assets/visemes.riv?v=${Date.now()}`;
           const response = await fetch(riveUrl);
           
           if (!response.ok) {
@@ -47,6 +47,7 @@ export function useRiveCharacter(containerRef: RefObject<HTMLDivElement>) {
           // Get the file as an ArrayBuffer for proper binary handling
           const buffer = await response.arrayBuffer();
           const uint8Array = new Uint8Array(buffer);
+          console.log(`Loading new Rive file: ${buffer.byteLength} bytes`);
           
           // Initialize Rive with the binary data
           riveInstance = new Rive({
