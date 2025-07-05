@@ -73,6 +73,92 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ElevenLabs speech with timestamps endpoint
+  app.post('/api/elevenlabs/speech-with-timestamps', async (req, res) => {
+    try {
+      const { text, apiKey } = req.body;
+      
+      if (!text || !apiKey) {
+        return res.status(400).json({ error: 'Text and API key are required' });
+      }
+
+      // Use a default voice ID for text-to-speech
+      const voiceId = process.env.ELEVENLABS_VOICE_ID || 'pNInz6obpgDQGcFmaJgB'; // Default voice
+      
+      const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}/stream?output_format=audio/mpeg&timestamp_start=true`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          text,
+          model_id: 'eleven_monolingual_v1',
+          voice_settings: {
+            stability: 0.5,
+            similarity_boost: 0.75
+          }
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`ElevenLabs API error: ${response.status}`);
+      }
+
+      // Handle multipart response
+      const contentType = response.headers.get('content-type');
+      if (contentType?.includes('multipart')) {
+        const responseText = await response.text();
+        
+        // Parse multipart response to extract timestamps
+        const parts = responseText.split('\r\n\r\n');
+        let timestamps = [];
+        
+        for (const part of parts) {
+          try {
+            if (part.includes('timestamps')) {
+              const jsonMatch = part.match(/\{[\s\S]*\}/);
+              if (jsonMatch) {
+                const data = JSON.parse(jsonMatch[0]);
+                if (data.timestamps) {
+                  timestamps = data.timestamps;
+                  break;
+                }
+              }
+            }
+          } catch (e) {
+            // Continue parsing other parts
+          }
+        }
+        
+        res.json({ timestamps });
+      } else {
+        // Fallback: generate synthetic timestamps based on text length
+        const words = text.split(' ');
+        const avgWordDuration = 0.5; // seconds per word
+        let currentTime = 0;
+        
+        const timestamps = words.map((word: string) => {
+          const start = currentTime;
+          const end = currentTime + avgWordDuration;
+          currentTime = end + 0.1; // Small gap between words
+          
+          return {
+            word,
+            start,
+            end,
+            char: word[0] || '',
+          };
+        });
+        
+        res.json({ timestamps });
+      }
+    } catch (error) {
+      console.error('Error generating speech with timestamps:', error);
+      res.status(500).json({ error: 'Failed to generate speech with timestamps' });
+    }
+  });
+
   // Create a new conversation
   app.post('/api/conversations', async (req, res) => {
     try {

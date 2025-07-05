@@ -1,6 +1,7 @@
-import { useCallback } from "react";
+import { useCallback, useRef, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useConversation } from "@elevenlabs/react";
+import { convertTimestampsToVisemes, playVisemeSequence, type VisemeEvent } from "./viseme-mapping";
 
 interface ElevenLabsConfig {
   signedUrl: string;
@@ -8,12 +9,29 @@ interface ElevenLabsConfig {
   agentId: string;
 }
 
-export function useElevenLabsAgent() {
+interface TimestampResponse {
+  timestamps: Array<{
+    char: string;
+    start: number;
+    end: number;
+    word?: string;
+  }>;
+}
+
+interface ElevenLabsAgentCallbacks {
+  onVisemeChange?: (viseme: number) => void;
+  onSpeechStart?: () => void;
+  onSpeechEnd?: () => void;
+}
+
+export function useElevenLabsAgent(callbacks?: ElevenLabsAgentCallbacks) {
   // Get ElevenLabs configuration
   const { data: config } = useQuery<ElevenLabsConfig>({
     queryKey: ['/api/elevenlabs/signed-url'],
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
+
+  const cleanupRef = useRef<(() => void) | null>(null);
 
   // Use the ElevenLabs React SDK hook
   const conversation = useConversation({
@@ -31,14 +49,66 @@ export function useElevenLabsAgent() {
     },
     onDisconnect: () => {
       console.log('Disconnected from ElevenLabs agent');
+      callbacks?.onSpeechEnd?.();
+      // Clean up any running viseme sequences
+      if (cleanupRef.current) {
+        cleanupRef.current();
+        cleanupRef.current = null;
+      }
     },
     onMessage: (message) => {
       console.log('Received message from agent:', message);
+      
+      // If the message contains speech, trigger viseme animation
+      if (message.source === 'ai' && message.message) {
+        handleSpeechWithVisemes(message.message);
+      }
     },
     onError: (error) => {
       console.error('ElevenLabs conversation error:', error);
     }
   });
+
+  // Handle speech with timestamp-based viseme animation
+  const handleSpeechWithVisemes = useCallback(async (text: string) => {
+    if (!config?.apiKey || !callbacks?.onVisemeChange) return;
+    
+    try {
+      callbacks.onSpeechStart?.();
+      
+      // Generate speech with timestamps using ElevenLabs API
+      const response = await fetch('/api/elevenlabs/speech-with-timestamps', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ text, apiKey: config.apiKey }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to generate speech with timestamps');
+      }
+
+      const data = await response.json();
+      
+      if (data.timestamps && data.timestamps.length > 0) {
+        // Convert timestamps to viseme events
+        const visemeEvents = convertTimestampsToVisemes(data.timestamps);
+        console.log('Generated viseme events:', visemeEvents);
+        
+        // Play the viseme sequence
+        const cleanup = playVisemeSequence(
+          visemeEvents,
+          callbacks.onVisemeChange,
+          Date.now()
+        );
+        
+        cleanupRef.current = cleanup;
+      }
+    } catch (error) {
+      console.error('Error generating speech with visemes:', error);
+    }
+  }, [config, callbacks]);
 
   const startConversation = useCallback(async () => {
     if (!config) {

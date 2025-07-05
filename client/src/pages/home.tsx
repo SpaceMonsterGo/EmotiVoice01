@@ -1,18 +1,38 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { CharacterDisplay } from "@/components/character-display";
 import { VoiceControls } from "@/components/voice-controls";
 import { ConversationHistory } from "@/components/conversation-history";
 import { useVoiceAgent } from "@/hooks/use-voice-agent";
+import { useElevenLabsAgent } from "@/lib/elevenlabs";
 import { Button } from "@/components/ui/button";
 import { Settings, Wifi } from "lucide-react";
 import { testRiveFile } from "@/test-rive";
 
 export default function Home() {
+  const [visemeCallback, setVisemeCallback] = useState<((viseme: number) => void) | null>(null);
+  
+  // ElevenLabs agent with timestamp-based viseme callbacks
   const {
-    isConnected,
+    isConnected: elevenLabsConnected,
+    isSpeaking: elevenLabsSpeaking,
+    startConversation,
+    stopConversation,
+    getInputVolume,
+    getOutputVolume
+  } = useElevenLabsAgent({
+    onVisemeChange: visemeCallback || undefined,
+    onSpeechStart: () => {
+      console.log('ElevenLabs speech started');
+    },
+    onSpeechEnd: () => {
+      console.log('ElevenLabs speech ended');
+    }
+  });
+
+  // Voice agent state (for UI management)
+  const {
     isRecording,
     isProcessing,
-    isSpeaking,
     messages,
     error,
     startRecording,
@@ -23,6 +43,16 @@ export default function Home() {
     agentStatus,
     clearError
   } = useVoiceAgent();
+
+  // Use ElevenLabs states where available
+  const isConnected = elevenLabsConnected;
+  const isSpeaking = elevenLabsSpeaking;
+
+  // Handle viseme callback from character display
+  const handleVisemeCallbackReady = useCallback((callback: (viseme: number) => void) => {
+    setVisemeCallback(() => callback);
+    console.log('Viseme callback ready for timestamp-based lip sync');
+  }, []);
 
   return (
     <div className="flex flex-col h-screen bg-background text-foreground overflow-hidden">
@@ -62,6 +92,7 @@ export default function Home() {
             isListening={isRecording}
             voiceActivity={voiceActivity}
             emotionalState="neutral"
+            onVisemeCallbackReady={handleVisemeCallbackReady}
           />
         </div>
 

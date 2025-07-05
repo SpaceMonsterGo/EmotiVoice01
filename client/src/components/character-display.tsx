@@ -1,4 +1,4 @@
-import { useMemo, useRef, useEffect } from "react";
+import { useMemo, useRef, useEffect, useCallback } from "react";
 import { useRiveCharacter } from "@/hooks/use-rive-character";
 
 interface CharacterDisplayProps {
@@ -6,13 +6,15 @@ interface CharacterDisplayProps {
   isListening: boolean;
   voiceActivity: number;
   emotionalState: string;
+  onVisemeCallbackReady?: (callback: (viseme: number) => void) => void;
 }
 
 export function CharacterDisplay({ 
   isSpeaking, 
   isListening, 
   voiceActivity, 
-  emotionalState 
+  emotionalState,
+  onVisemeCallbackReady 
 }: CharacterDisplayProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const { canvas, setRiveState } = useRiveCharacter(containerRef);
@@ -23,35 +25,25 @@ export function CharacterDisplay({
     setRiveState('isTyping', isSpeaking || isListening);
   }, [isSpeaking, isListening, setRiveState]);
 
-  // Add more frequent animation updates for lip sync
+  // Handle viseme changes from timestamp-based lip sync
+  const handleVisemeChange = useCallback((viseme: number) => {
+    setRiveState('visemes', viseme);
+    console.log(`Viseme changed to: ${viseme}`);
+  }, [setRiveState]);
+
+  // Expose viseme callback to parent component
   useEffect(() => {
-    let animationInterval: NodeJS.Timeout | null = null;
-    
-    if (isSpeaking) {
-      // Start animation loop for lip sync
-      animationInterval = setInterval(() => {
-        if (voiceActivity > 0.001) { // Much lower threshold since values are very small
-          // Use voice activity to drive visemes - scale up the small values
-          const scaledActivity = Math.min(voiceActivity * 1000, 1); // Scale up by 1000
-          const visemeIndex = Math.floor(scaledActivity * 8) + 1; // Use visemes 1-9 for speech
-          setRiveState('visemes', Math.min(visemeIndex, 9));
-          console.log(`Voice activity: ${voiceActivity}, scaled: ${scaledActivity}, viseme: ${visemeIndex}`);
-        } else {
-          // Create random mouth movements when speaking but low activity
-          const randomViseme = Math.floor(Math.random() * 6) + 1; // Use visemes 1-6
-          setRiveState('visemes', randomViseme);
-        }
-      }, 150); // Update every 150ms for smooth animation
-    } else {
+    if (onVisemeCallbackReady) {
+      onVisemeCallbackReady(handleVisemeChange);
+    }
+  }, [onVisemeCallbackReady, handleVisemeChange]);
+
+  // Set mouth to closed when not speaking
+  useEffect(() => {
+    if (!isSpeaking) {
       setRiveState('visemes', 0); // Closed mouth when not speaking
     }
-    
-    return () => {
-      if (animationInterval) {
-        clearInterval(animationInterval);
-      }
-    };
-  }, [isSpeaking, voiceActivity, setRiveState]);
+  }, [isSpeaking, setRiveState]);
 
   useEffect(() => {
     // Map emotional states to numbers (you can adjust these mappings)
