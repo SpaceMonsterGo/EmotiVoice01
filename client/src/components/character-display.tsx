@@ -30,10 +30,12 @@ export function CharacterDisplay({
     if (isSpeaking) {
       // Start animation loop for lip sync
       animationInterval = setInterval(() => {
-        if (voiceActivity > 0.1) {
-          // Use voice activity to drive visemes
-          const visemeIndex = Math.floor((voiceActivity * 9) + 1); // Use visemes 1-9 for speech
+        if (voiceActivity > 0.001) { // Much lower threshold since values are very small
+          // Use voice activity to drive visemes - scale up the small values
+          const scaledActivity = Math.min(voiceActivity * 1000, 1); // Scale up by 1000
+          const visemeIndex = Math.floor(scaledActivity * 8) + 1; // Use visemes 1-9 for speech
           setRiveState('visemes', Math.min(visemeIndex, 9));
+          console.log(`Voice activity: ${voiceActivity}, scaled: ${scaledActivity}, viseme: ${visemeIndex}`);
         } else {
           // Create random mouth movements when speaking but low activity
           const randomViseme = Math.floor(Math.random() * 6) + 1; // Use visemes 1-6

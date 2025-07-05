@@ -39,7 +39,7 @@ export function VoiceControls({
         {/* Main Voice Button */}
         <Button
           onClick={isRecording ? onStopRecording : onStartRecording}
-          disabled={isProcessing}
+          disabled={false} // Never disable - always allow stopping
           className={`relative p-6 rounded-full transition-all duration-200 transform hover:scale-105 active:scale-95 shadow-lg ${
             isRecording 
               ? 'bg-red-500 hover:bg-red-600 shadow-red-500/25' 

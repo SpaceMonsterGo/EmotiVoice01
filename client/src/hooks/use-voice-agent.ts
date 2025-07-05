@@ -183,17 +183,21 @@ export function useVoiceAgent() {
   }, [isConnected, isMuted, startConversation]);
 
   const stopRecording = useCallback(async () => {
-    if (!isRecording) return;
+    console.log('Stop recording called, isRecording:', isRecording);
     
     try {
       // Immediately update UI state for responsive feedback
       setIsRecording(false);
       setIsProcessing(false);
+      setIsSpeaking(false); // Also stop speaking state
       setAgentStatus("Ready to chat");
+      
+      console.log('Updated UI states to stopped');
       
       // Send WebSocket message to stop recording
       if (wsRef.current?.readyState === WebSocket.OPEN) {
         wsRef.current.send(JSON.stringify({ type: 'voice_end' }));
+        console.log('Sent voice_end WebSocket message');
       }
       
       // Stop ElevenLabs conversation without awaiting (non-blocking)
@@ -202,9 +206,10 @@ export function useVoiceAgent() {
       });
       
     } catch (error) {
+      console.error('Error in stopRecording:', error);
       setError(`Failed to stop recording: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
-  }, [isRecording, stopConversation]);
+  }, [stopConversation]); // Removed isRecording dependency to allow multiple calls
 
   const toggleMute = useCallback(() => {
     setIsMuted(prev => !prev);
