@@ -26,10 +26,17 @@ export function useVoiceAgent() {
     getInputVolume
   } = useElevenLabsAgent();
 
-  // Use ElevenLabs speaking state
+  // Use ElevenLabs speaking state and update status accordingly
   useEffect(() => {
     setIsSpeaking(elevenLabsSpeaking);
-  }, [elevenLabsSpeaking]);
+    if (elevenLabsSpeaking) {
+      setAgentStatus("Speaking...");
+      setIsRecording(false);
+      setIsProcessing(false);
+    } else if (isConnected && !isRecording && !isProcessing) {
+      setAgentStatus("Ready to chat");
+    }
+  }, [elevenLabsSpeaking, isConnected, isRecording, isProcessing]);
 
   // Update voice activity from ElevenLabs input volume
   useEffect(() => {

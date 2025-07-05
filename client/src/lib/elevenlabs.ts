@@ -19,6 +19,13 @@ export function useElevenLabsAgent() {
   const conversation = useConversation({
     apiKey: config?.apiKey,
     agentId: config?.agentId,
+    clientTools: {
+      emotion_detector: async ({ emotion, confidence = 0.8 }: { emotion: string; confidence?: number }) => {
+        console.log(`Emotion detected: ${emotion} (confidence: ${confidence})`);
+        // This will be used to update the character's emotional state
+        return `Detected emotion: ${emotion} with ${Math.round(confidence * 100)}% confidence`;
+      }
+    },
     onConnect: () => {
       console.log('Connected to ElevenLabs agent');
     },

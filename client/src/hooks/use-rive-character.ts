@@ -104,10 +104,12 @@ export function useRiveCharacter(containerRef: RefObject<HTMLDivElement>) {
         } else if (typeof value === 'number') {
           input.value = Math.round(value); // Ensure integer for visemes/emotion
         }
-        console.log(`Updated Rive input ${key} to ${value}`);
+        console.log(`Updated Rive input ${key} to ${value}`, input);
+      } else {
+        console.warn(`Rive input ${key} not found in state machine`, stateMachine.map((sm: any) => sm.name));
       }
     }
-  }, []);
+  }, [stateMachine]);
 
   return {
     canvas,

@@ -23,15 +23,32 @@ export function CharacterDisplay({
     setRiveState('isTyping', isSpeaking || isListening);
   }, [isSpeaking, isListening, setRiveState]);
 
+  // Add more frequent animation updates for lip sync
   useEffect(() => {
-    // Map voice activity to visemes (0-9 for lip sync)
-    if (isSpeaking && voiceActivity > 0.1) {
-      // Cycle through visemes based on voice activity for lip sync effect
-      const visemeIndex = Math.floor((voiceActivity * 10) % 10);
-      setRiveState('visemes', visemeIndex);
+    let animationInterval: NodeJS.Timeout | null = null;
+    
+    if (isSpeaking) {
+      // Start animation loop for lip sync
+      animationInterval = setInterval(() => {
+        if (voiceActivity > 0.1) {
+          // Use voice activity to drive visemes
+          const visemeIndex = Math.floor((voiceActivity * 9) + 1); // Use visemes 1-9 for speech
+          setRiveState('visemes', Math.min(visemeIndex, 9));
+        } else {
+          // Create random mouth movements when speaking but low activity
+          const randomViseme = Math.floor(Math.random() * 6) + 1; // Use visemes 1-6
+          setRiveState('visemes', randomViseme);
+        }
+      }, 150); // Update every 150ms for smooth animation
     } else {
       setRiveState('visemes', 0); // Closed mouth when not speaking
     }
+    
+    return () => {
+      if (animationInterval) {
+        clearInterval(animationInterval);
+      }
+    };
   }, [isSpeaking, voiceActivity, setRiveState]);
 
   useEffect(() => {
