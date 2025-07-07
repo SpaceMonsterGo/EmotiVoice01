@@ -29,6 +29,7 @@ export function useElevenLabsSimple() {
   }, []);
 
   // Simple viseme generation for generic audio without text
+  // Uses Rive file specification: 0=Neutral, 1=F, 2=M, 3=O, 4=U, 5=E, 6=AI, 7=CH, 8=S, 9=L
   const generateVisemes = useCallback((duration: number) => {
     if (!visemeCallbackRef.current) return;
     
@@ -36,8 +37,8 @@ export function useElevenLabsSimple() {
     for (let i = 0; i < visemeCount; i++) {
       setTimeout(() => {
         if (visemeCallbackRef.current) {
-          // Generate semi-realistic viseme sequence
-          const visemeSequence = [1, 3, 5, 7, 9, 11, 13, 15, 2, 4, 6, 8, 10, 12, 14];
+          // Generate realistic viseme sequence using Rive mapping (0-9)
+          const visemeSequence = [6, 5, 3, 1, 2, 8, 9, 7, 4]; // AI, E, O, F, M, S, L, CH, U
           const viseme = visemeSequence[i % visemeSequence.length];
           visemeCallbackRef.current(viseme);
         }
@@ -47,35 +48,43 @@ export function useElevenLabsSimple() {
     // Reset to neutral after speech
     setTimeout(() => {
       if (visemeCallbackRef.current) {
-        visemeCallbackRef.current(0);
+        visemeCallbackRef.current(0); // Neutral
       }
     }, duration * 1000);
   }, []);
 
-  // Generate visemes based on text content for more realistic lip sync
+  // Generate visemes based on text content matching Rive file specification
+  // 0=Neutral, 1=F, 2=M, 3=O, 4=U, 5=E, 6=AI, 7=CH, 8=S, 9=L
   const generateTextBasedVisemes = useCallback((text: string) => {
     if (!visemeCallbackRef.current || !text) return;
 
-    // Simple text-to-viseme mapping
+    // Text-to-viseme mapping matching Rive file specification
     const textToVisemeMap: { [key: string]: number } = {
-      'a': 1, 'e': 2, 'i': 3, 'o': 4, 'u': 5,
-      'b': 6, 'p': 6, 'm': 6,
-      'f': 7, 'v': 7,
-      't': 9, 'd': 9, 'n': 9, 'l': 9,
-      'k': 10, 'g': 10,
-      'ch': 11, 'sh': 11,
-      'r': 12,
-      's': 13, 'z': 13,
-      'th': 8
+      // Vowels
+      'a': 6, 'ai': 6, 'ay': 6,  // AI sound
+      'e': 5, 'ea': 5, 'ee': 5,  // E sound
+      'i': 6, 'ie': 6,           // AI sound (closest to I)
+      'o': 3, 'oo': 4, 'ou': 4,  // O sound / U sound
+      'u': 4, 'ue': 4,           // U sound
+      
+      // Consonants
+      'f': 1, 'v': 1, 'ph': 1,   // F sound (lip-teeth)
+      'm': 2, 'b': 2, 'p': 2,    // M sound (lip closure)
+      'ch': 7, 'sh': 7, 'j': 7,  // CH sound
+      's': 8, 'z': 8, 'c': 8,    // S sound
+      'l': 9, 'r': 9,            // L sound (tongue position)
+      't': 8, 'd': 8, 'n': 8,    // S sound (closest approximation)
+      'k': 3, 'g': 3, 'q': 3,    // O sound (back of mouth)
+      'h': 5, 'w': 4, 'y': 6     // Various approximations
     };
 
     const chars = text.toLowerCase().split('');
-    const charDuration = 150; // ms per character
+    const charDuration = 120; // ms per character (slightly faster)
     
     chars.forEach((char, index) => {
       if (char === ' ') return;
       
-      const viseme = textToVisemeMap[char] || 1; // Default to 'a' sound
+      const viseme = textToVisemeMap[char] || 5; // Default to E sound
       const delay = index * charDuration;
       
       setTimeout(() => {
@@ -88,7 +97,7 @@ export function useElevenLabsSimple() {
     // Reset to neutral after text
     setTimeout(() => {
       if (visemeCallbackRef.current) {
-        visemeCallbackRef.current(0);
+        visemeCallbackRef.current(0); // Neutral
       }
     }, chars.length * charDuration);
   }, []);

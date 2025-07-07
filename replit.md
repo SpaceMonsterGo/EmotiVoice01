@@ -127,6 +127,8 @@ Changelog:
   - Uses proper ping/pong responses to maintain connection
   - Simplified audio streaming using 250ms MediaRecorder chunks
   - Conversation continues seamlessly after initial AI greeting
+  - Updated viseme mapping to match Rive file: 0=Neutral, 1=F, 2=M, 3=O, 4=U, 5=E, 6=AI, 7=CH, 8=S, 9=L
+  - Implemented text-based viseme generation for realistic lip sync matching agent responses
 
 ## User Preferences
 
