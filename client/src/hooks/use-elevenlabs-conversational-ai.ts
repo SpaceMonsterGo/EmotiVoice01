@@ -50,18 +50,9 @@ export function useElevenLabsConversationalAI() {
         console.log('Connected to ElevenLabs Conversational AI');
         setState(prev => ({ ...prev, isConnected: true, isProcessing: false }));
         
-        // Send conversation initiation
+        // Send conversation initiation - use agent's default config
         const initMessage = {
-          type: "conversation_initiation_client_data",
-          conversation_config_override: {
-            agent: {
-              prompt: {
-                prompt: "You are a helpful, friendly AI assistant. Keep responses conversational and engaging."
-              },
-              first_message: "Hello! I'm your AI assistant. How can I help you today?",
-              language: "en"
-            }
-          }
+          type: "conversation_initiation_client_data"
         };
         console.log('Sending conversation initiation:', initMessage);
         ws.send(JSON.stringify(initMessage));
@@ -95,14 +86,19 @@ export function useElevenLabsConversationalAI() {
           isSpeaking: false
         }));
         
-        // Try to reconnect if unexpected close
-        if (event.code !== 1000) {
+        // Try to reconnect if unexpected close (but not for config errors)
+        if (event.code !== 1000 && event.code !== 1008) {
           console.log('Unexpected close, attempting to reconnect...');
           setTimeout(() => {
             if (state.isListening) {
               connect();
             }
           }, 2000);
+        } else if (event.code === 1008) {
+          setState(prev => ({ 
+            ...prev, 
+            error: 'Configuration error: ' + event.reason 
+          }));
         }
       };
 
@@ -130,6 +126,7 @@ export function useElevenLabsConversationalAI() {
       case 'audio':
         const audioEvent = data.audio_event;
         if (audioEvent?.audio_base_64) {
+          console.log('Received audio response, playing...');
           setState(prev => ({ ...prev, isSpeaking: true }));
           playAudioResponse(audioEvent.audio_base_64);
         }
