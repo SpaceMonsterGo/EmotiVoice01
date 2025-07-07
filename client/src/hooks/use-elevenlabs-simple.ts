@@ -22,6 +22,14 @@ export function useElevenLabsSimple() {
   const streamRef = useRef<MediaStream | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const visemeCallbackRef = useRef<((viseme: number) => void) | null>(null);
+  
+  // Refs for forced alignment data collection
+  const currentAudioDataRef = useRef<Uint8Array | null>(null);
+  const currentTranscriptRef = useRef<{
+    text: string;
+    type: 'user' | 'agent';
+    timestamp: number;
+  } | null>(null);
 
   // Set viseme callback
   const setVisemeCallback = useCallback((callback: (viseme: number) => void) => {
@@ -129,6 +137,9 @@ export function useElevenLabsSimple() {
                 audioArray[i] = audioBytes.charCodeAt(i);
               }
               
+              // Store audio data for potential forced alignment
+              currentAudioDataRef.current = audioArray;
+              
               // Create audio context and play PCM16 data
               if (!audioContextRef.current) {
                 audioContextRef.current = new AudioContext();
@@ -177,14 +188,32 @@ export function useElevenLabsSimple() {
           break;
 
         case 'user_transcript':
-          console.log('User transcript received:', data.user_transcription_event?.user_transcript);
+          const userTranscript = data.user_transcription_event?.user_transcript;
+          console.log('User transcript received:', userTranscript);
+          
+          // Store transcript for potential forced alignment
+          if (userTranscript) {
+            currentTranscriptRef.current = {
+              text: userTranscript,
+              type: 'user',
+              timestamp: Date.now()
+            };
+          }
           break;
 
         case 'agent_response':
           const agentText = data.agent_response_event?.agent_response;
           console.log('Agent response:', agentText);
-          // Generate visemes based on the text content for more realistic lip sync
+          
+          // Store agent response for potential forced alignment
           if (agentText) {
+            currentTranscriptRef.current = {
+              text: agentText,
+              type: 'agent',
+              timestamp: Date.now()
+            };
+            
+            // Generate visemes based on the text content for more realistic lip sync
             generateTextBasedVisemes(agentText);
           }
           break;
@@ -330,10 +359,24 @@ export function useElevenLabsSimple() {
     };
   }, [stopConversation]);
 
+  // Function to get collected alignment data
+  const getAlignmentData = useCallback(() => {
+    if (currentAudioDataRef.current && currentTranscriptRef.current) {
+      return {
+        audioData: currentAudioDataRef.current,
+        transcript: currentTranscriptRef.current.text,
+        type: currentTranscriptRef.current.type,
+        timestamp: currentTranscriptRef.current.timestamp
+      };
+    }
+    return null;
+  }, []);
+
   return {
     ...state,
     startConversation,
     stopConversation,
     setVisemeCallback,
+    getAlignmentData
   };
 }

@@ -129,6 +129,8 @@ Changelog:
   - Conversation continues seamlessly after initial AI greeting
   - Updated viseme mapping to match Rive file: 0=Neutral, 1=F, 2=M, 3=O, 4=U, 5=E, 6=AI, 7=CH, 8=S, 9=L
   - Implemented text-based viseme generation for realistic lip sync matching agent responses
+  - Added forced alignment data collection infrastructure for future phoneme-level precision
+  - Created ForcedAlignmentProcessor with phoneme-to-viseme mapping system
 
 ## User Preferences
 
