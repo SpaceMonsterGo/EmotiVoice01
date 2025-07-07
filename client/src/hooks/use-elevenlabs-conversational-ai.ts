@@ -146,9 +146,13 @@ export function useElevenLabsConversationalAI() {
       case 'audio':
         const audioEvent = data.audio_event;
         if (audioEvent?.audio_base_64) {
-          console.log('Received audio response, playing...');
-          setState(prev => ({ ...prev, isSpeaking: true }));
-          playAudioResponse(audioEvent.audio_base_64);
+          console.log('Received audio chunk, queuing...');
+          if (!state.isSpeaking) {
+            setState(prev => ({ ...prev, isSpeaking: true }));
+          }
+          // Queue audio chunks instead of playing immediately
+          audioQueueRef.current.push(audioEvent.audio_base_64);
+          processAudioQueue();
         }
         break;
 
@@ -181,16 +185,9 @@ export function useElevenLabsConversationalAI() {
         break;
 
       case 'ping':
-        // Respond to ping with pong to keep connection alive
+        // ElevenLabs handles ping/pong automatically - just log it
         const pingEvent = data.ping_event;
-        if (pingEvent && websocketRef.current) {
-          const pongMessage = {
-            type: "pong",
-            event_id: pingEvent.event_id
-          };
-          websocketRef.current.send(JSON.stringify(pongMessage));
-          console.log('Sent pong response for ping:', pingEvent.event_id);
-        }
+        console.log('Received ping:', pingEvent?.event_id);
         break;
 
       case 'client_tool_call':
@@ -271,12 +268,12 @@ export function useElevenLabsConversationalAI() {
       
       // Use newer AudioWorklet if available, fallback to ScriptProcessor
       if (audioContext.audioWorklet) {
-        console.log('Using AudioWorklet for audio processing');
-        // For now, use ScriptProcessor as it's more compatible
-        setupScriptProcessor(audioContext, source);
+        console.log('Using modern MediaRecorder for audio processing');
+        // Use MediaRecorder instead of deprecated ScriptProcessor
+        startMediaRecorder();
       } else {
-        console.log('Using ScriptProcessor for audio processing');
-        setupScriptProcessor(audioContext, source);
+        console.log('Using modern MediaRecorder for audio processing');
+        startMediaRecorder();
       }
 
     } catch (error) {
@@ -284,31 +281,33 @@ export function useElevenLabsConversationalAI() {
     }
   }, []);
 
-  const setupScriptProcessor = (audioContext: AudioContext, source: MediaStreamAudioSourceNode) => {
-    const processor = audioContext.createScriptProcessor(4096, 1, 1);
+  const startMediaRecorder = () => {
+    if (!streamRef.current) return;
+    
+    try {
+      const mediaRecorder = new MediaRecorder(streamRef.current);
+      mediaRecorderRef.current = mediaRecorder;
 
-    source.connect(processor);
-    processor.connect(audioContext.destination);
+      mediaRecorder.ondataavailable = async (event) => {
+        if (event.data.size > 0 && websocketRef.current?.readyState === WebSocket.OPEN) {
+          try {
+            const arrayBuffer = await event.data.arrayBuffer();
+            const base64Audio = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+            
+            websocketRef.current.send(JSON.stringify({
+              user_audio_chunk: base64Audio
+            }));
+          } catch (error) {
+            console.error('Error processing audio chunk:', error);
+          }
+        }
+      };
 
-    processor.onaudioprocess = (event) => {
-      if (!websocketRef.current || websocketRef.current.readyState !== WebSocket.OPEN) {
-        return;
-      }
-
-      const inputBuffer = event.inputBuffer.getChannelData(0);
-      
-      // Convert float32 audio to PCM16
-      const pcm16Buffer = new Int16Array(inputBuffer.length);
-      for (let i = 0; i < inputBuffer.length; i++) {
-        pcm16Buffer[i] = Math.max(-32768, Math.min(32767, inputBuffer[i] * 32768));
-      }
-
-      // Convert to base64 and send
-      const base64Audio = btoa(String.fromCharCode(...new Uint8Array(pcm16Buffer.buffer)));
-      websocketRef.current.send(JSON.stringify({
-        user_audio_chunk: base64Audio
-      }));
-    };
+      mediaRecorder.start(100); // 100ms chunks
+      console.log('Started MediaRecorder audio streaming');
+    } catch (error) {
+      console.error('Failed to start MediaRecorder:', error);
+    }
   };
 
   // Stop listening
@@ -316,6 +315,11 @@ export function useElevenLabsConversationalAI() {
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop());
       streamRef.current = null;
+    }
+
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+      mediaRecorderRef.current = null;
     }
 
     if (audioContextRef.current) {
@@ -326,10 +330,17 @@ export function useElevenLabsConversationalAI() {
     setState(prev => ({ ...prev, isListening: false }));
   }, []);
 
-  // Play audio response
-  const playAudioResponse = useCallback(async (base64Audio: string) => {
+  // Process queued audio chunks
+  const processAudioQueue = useCallback(() => {
+    if (isPlayingRef.current || audioQueueRef.current.length === 0) {
+      return;
+    }
+
+    isPlayingRef.current = true;
+    const base64Audio = audioQueueRef.current.shift()!;
+    
     try {
-      console.log('Processing audio data, length:', base64Audio.length);
+      console.log('Processing audio chunk, length:', base64Audio.length);
       
       // Convert base64 to PCM audio buffer
       const binaryString = atob(base64Audio);
@@ -360,20 +371,14 @@ export function useElevenLabsConversationalAI() {
       source.buffer = audioBuffer;
       source.connect(audioContext.destination);
       
-      // Generate visemes during playback
+      // Generate visemes for this chunk
       const duration = audioBuffer.duration;
-      const visemeCount = Math.floor(duration * 8); // 8 visemes per second
+      const visemeCount = Math.floor(duration * 8);
       
-      // Clear any existing viseme animation
-      if (visemeCallbackRef.current) {
-        visemeCallbackRef.current(0);
-      }
-      
-      // Start viseme animation
+      // Start viseme animation for this chunk
       for (let i = 0; i < visemeCount; i++) {
         setTimeout(() => {
-          if (visemeCallbackRef.current && source.context.state === 'running') {
-            // Generate realistic viseme sequence based on speech patterns
+          if (visemeCallbackRef.current) {
             const visemeSequence = [1, 3, 5, 7, 9, 11, 13, 2, 4, 6, 8, 10, 12, 14, 15];
             const viseme = visemeSequence[i % visemeSequence.length];
             visemeCallbackRef.current(viseme);
@@ -382,18 +387,26 @@ export function useElevenLabsConversationalAI() {
       }
       
       source.onended = () => {
-        console.log('Audio playback ended');
-        setState(prev => ({ ...prev, isSpeaking: false }));
-        if (visemeCallbackRef.current) {
-          visemeCallbackRef.current(0);
+        console.log('Audio chunk ended');
+        isPlayingRef.current = false;
+        
+        // Process next chunk if available
+        if (audioQueueRef.current.length > 0) {
+          setTimeout(() => processAudioQueue(), 50);
+        } else {
+          // All chunks finished
+          setState(prev => ({ ...prev, isSpeaking: false }));
+          if (visemeCallbackRef.current) {
+            visemeCallbackRef.current(0);
+          }
         }
       };
 
-      console.log('Starting audio playback with viseme animation...');
       source.start();
 
     } catch (error) {
-      console.error('Error playing audio:', error);
+      console.error('Error playing audio chunk:', error);
+      isPlayingRef.current = false;
       setState(prev => ({ ...prev, isSpeaking: false }));
     }
   }, []);
