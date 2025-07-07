@@ -83,7 +83,7 @@ export default function Home() {
                   disabled={false}
                   className={`w-20 h-20 rounded-full transition-all duration-300 ${
                     isListening 
-                      ? 'bg-red-500 hover:bg-red-600 animate-pulse' 
+                      ? 'bg-red-500 hover:bg-red-600' 
                       : 'bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600'
                   }`}
                 >

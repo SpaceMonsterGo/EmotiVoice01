@@ -171,10 +171,7 @@ export function CharacterDisplay({
         )}
       </div>
       
-      {/* Voice Activity Ring - Only show when speaking */}
-      <div className={`absolute inset-0 rounded-full border-4 transition-all duration-300 ${
-        isSpeaking ? 'border-green-500/50 opacity-100 animate-pulse' : 'border-transparent opacity-0'
-      }`}></div>
+
       
       {/* Emotional State Indicator */}
       <div className={`absolute top-4 right-4 w-4 h-4 rounded-full animate-bounce-gentle ${

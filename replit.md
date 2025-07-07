@@ -138,6 +138,8 @@ Changelog:
   - Removed distracting "Listening" text and flashing colored progress bar
   - Simplified character animations to only show activity during AI speech
   - Cleaned up status indicators to reduce visual noise during conversations
+  - Removed microphone button pulsing animation for cleaner interaction
+  - Eliminated green ring around Rive character animation
 
 ## User Preferences
 
