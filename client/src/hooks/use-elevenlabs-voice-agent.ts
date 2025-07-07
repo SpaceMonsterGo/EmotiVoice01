@@ -31,6 +31,7 @@ export function useElevenLabsVoiceAgent() {
   const analyserRef = useRef<AnalyserNode | null>(null);
   const visemeCallbackRef = useRef<((viseme: number) => void) | null>(null);
   const animationFrameRef = useRef<number | null>(null);
+  const isProcessingMessageRef = useRef<boolean>(false); // Track message processing
 
   // Connect to ElevenLabs Conversational AI WebSocket
   const connectWebSocket = useCallback(async () => {
@@ -40,7 +41,7 @@ export function useElevenLabsVoiceAgent() {
          websocketRef.current.readyState === WebSocket.OPEN)) {
       return;
     }
-    
+
     try {
       setState(prev => ({ ...prev, isProcessing: true, error: null }));
 
@@ -54,7 +55,7 @@ export function useElevenLabsVoiceAgent() {
       // Create WebSocket connection with API key in URL
       const authenticatedUrl = `${signedUrl}&api_key=${apiKey}`;
       const ws = new WebSocket(authenticatedUrl);
-      
+
       ws.addEventListener('open', () => {
         console.log('Connected to ElevenLabs Conversational AI');
         setState(prev => ({ 
@@ -62,7 +63,7 @@ export function useElevenLabsVoiceAgent() {
           isConnected: true, 
           isProcessing: false 
         }));
-        
+
         // Send conversation initiation with proper format
         const initMessage = {
           type: "conversation_initiation_client_data",
@@ -80,13 +81,13 @@ export function useElevenLabsVoiceAgent() {
         try {
           const data = JSON.parse(event.data);
           console.log('Received WebSocket message:', data);
-          
+
           // Handle different ElevenLabs message types
           if (data.type === 'conversation_initiation_metadata') {
             console.log('Conversation initiated:', data.conversation_initiation_metadata_event);
           } else if (data.type === 'audio' && data.audio_event) {
             setState(prev => ({ ...prev, isSpeaking: true }));
-            
+
             // Play the audio and trigger visemes
             const audioData = data.audio_event.audio_base_64;
             if (audioData && visemeCallbackRef.current) {
@@ -101,15 +102,15 @@ export function useElevenLabsVoiceAgent() {
                   }
                   const audioBlob = new Blob([audioArray], { type: 'audio/wav' });
                   const audioUrl = URL.createObjectURL(audioBlob);
-                  
+
                   const audio = new Audio(audioUrl);
-                  
+
                   // Generate visemes during playback
                   audio.onplay = () => {
                     if (visemeCallbackRef.current) {
                       const duration = audio.duration || 2;
                       const visemeCount = Math.floor(duration * 10);
-                      
+
                       for (let i = 0; i < visemeCount; i++) {
                         setTimeout(() => {
                           if (visemeCallbackRef.current) {
@@ -120,7 +121,7 @@ export function useElevenLabsVoiceAgent() {
                       }
                     }
                   };
-                  
+
                   audio.onended = () => {
                     setState(prev => ({ ...prev, isSpeaking: false }));
                     if (visemeCallbackRef.current) {
@@ -128,7 +129,7 @@ export function useElevenLabsVoiceAgent() {
                     }
                     URL.revokeObjectURL(audioUrl);
                   };
-                  
+
                   await audio.play();
                 } catch (error) {
                   console.error('Error playing audio:', error);
@@ -162,6 +163,7 @@ export function useElevenLabsVoiceAgent() {
           isRecording: false,
           isSpeaking: false 
         }));
+        isProcessingMessageRef.current = false;
       });
 
       websocketRef.current = ws;
@@ -186,7 +188,7 @@ export function useElevenLabsVoiceAgent() {
       if (state.isProcessing || websocketRef.current?.readyState === WebSocket.CONNECTING) {
         return;
       }
-      
+
       if (!state.isConnected && websocketRef.current?.readyState !== WebSocket.OPEN) {
         await connectWebSocket();
         return; // Let the connection establish first
@@ -198,12 +200,12 @@ export function useElevenLabsVoiceAgent() {
           channelCount: 1 
         } 
       });
-      
+
       // Setup voice activity detection
       setupVoiceActivityDetection(stream);
-      
+
       setState(prev => ({ ...prev, isRecording: true }));
-      
+
     } catch (error) {
       setState(prev => ({ 
         ...prev, 
@@ -218,17 +220,17 @@ export function useElevenLabsVoiceAgent() {
       mediaRecorderRef.current.stop();
       mediaRecorderRef.current = null;
     }
-    
+
     if (audioContextRef.current) {
       audioContextRef.current.close();
       audioContextRef.current = null;
     }
-    
+
     if (animationFrameRef.current) {
       cancelAnimationFrame(animationFrameRef.current);
       animationFrameRef.current = null;
     }
-    
+
     setState(prev => ({ 
       ...prev, 
       isRecording: false, 
@@ -241,27 +243,27 @@ export function useElevenLabsVoiceAgent() {
     const audioContext = new AudioContext();
     const source = audioContext.createMediaStreamSource(stream);
     const analyser = audioContext.createAnalyser();
-    
+
     analyser.fftSize = 256;
     source.connect(analyser);
-    
+
     audioContextRef.current = audioContext;
     analyserRef.current = analyser;
-    
+
     const detectActivity = () => {
       if (!analyserRef.current) return;
-      
+
       const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
       analyserRef.current.getByteFrequencyData(dataArray);
-      
+
       const average = dataArray.reduce((a, b) => a + b) / dataArray.length;
       const activity = Math.min(average / 128, 1);
-      
+
       setState(prev => ({ ...prev, voiceActivity: activity }));
-      
+
       animationFrameRef.current = requestAnimationFrame(detectActivity);
     };
-    
+
     detectActivity();
   }, []);
 

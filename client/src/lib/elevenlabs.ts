@@ -59,10 +59,9 @@ export function useElevenLabsAgent(callbacks?: ElevenLabsAgentCallbacks) {
     onMessage: (message) => {
       console.log('Received message from agent:', message);
       
-      // If the message contains speech, trigger viseme animation
-      if (message.source === 'ai' && message.message) {
-        handleSpeechWithVisemes(message.message);
-      }
+      // Don't generate additional speech - ElevenLabs Conversational AI handles audio
+      // Only extract viseme timing data if needed for lip sync
+      // The built-in audio from the conversational AI will play automatically
     },
     onError: (error) => {
       console.error('ElevenLabs conversation error:', error);
