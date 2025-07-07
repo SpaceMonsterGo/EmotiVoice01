@@ -54,70 +54,59 @@ export default function Home() {
     console.log('Viseme callback ready');
   }, []);
 
-  // Audio-based viseme generation using output volume
+  // Test viseme animation with fake sequence
   useEffect(() => {
     if (!visemeCallback) return;
     
-    let animationFrame: number;
-    let visemeTimer: NodeJS.Timeout | null = null;
-    
-    const updateViseme = () => {
-      if (isSpeaking && getOutputVolume) {
-        const outputVolume = getOutputVolume();
-        
-        if (outputVolume > 0) {
-          // Use output volume to generate visemes
-          // Output volume is typically 0-100
-          const normalizedVolume = Math.min(outputVolume / 100, 1);
-          
-          // Create variation in visemes based on volume
-          let visemeIndex: number;
-          
-          if (normalizedVolume < 0.1) {
-            visemeIndex = 0; // Closed
-          } else if (normalizedVolume < 0.3) {
-            // Low volume - subtle mouth movements
-            visemeIndex = Math.random() < 0.5 ? 1 : 2;
-          } else if (normalizedVolume < 0.6) {
-            // Medium volume - vowel sounds
-            visemeIndex = Math.floor(Math.random() * 3) + 3; // 3-5
-          } else {
-            // High volume - open mouth sounds
-            visemeIndex = Math.floor(Math.random() * 4) + 6; // 6-9
-          }
-          
-          visemeCallback(visemeIndex);
-          console.log(`Output volume: ${outputVolume}, viseme: ${visemeIndex}`);
-        } else {
-          // No volume, but still speaking - use random subtle movements
-          visemeTimer = setTimeout(() => {
-            const randomViseme = Math.floor(Math.random() * 3) + 1;
-            visemeCallback(randomViseme);
-          }, 150);
-        }
-      } else {
-        // Not speaking - closed mouth
-        visemeCallback(0);
-      }
-      
-      animationFrame = requestAnimationFrame(updateViseme);
-    };
+    let timeouts: NodeJS.Timeout[] = [];
     
     if (isSpeaking) {
-      updateViseme();
+      // Create a test sequence that cycles through all visemes
+      const testSequence = [
+        { viseme: 1, delay: 0 },     // A
+        { viseme: 2, delay: 200 },   // E
+        { viseme: 3, delay: 400 },   // I
+        { viseme: 4, delay: 600 },   // O
+        { viseme: 5, delay: 800 },   // U
+        { viseme: 6, delay: 1000 },  // M/B/P
+        { viseme: 7, delay: 1200 },  // F/V
+        { viseme: 8, delay: 1400 },  // TH
+        { viseme: 9, delay: 1600 },  // T/D/S/Z
+        { viseme: 0, delay: 1800 },  // Closed
+      ];
+      
+      console.log('Starting test viseme sequence...');
+      
+      testSequence.forEach(({ viseme, delay }) => {
+        const timeout = setTimeout(() => {
+          visemeCallback(viseme);
+          console.log(`Test viseme: ${viseme}`);
+        }, delay);
+        timeouts.push(timeout);
+      });
+      
+      // Repeat the sequence every 2 seconds while speaking
+      const repeatInterval = setInterval(() => {
+        testSequence.forEach(({ viseme, delay }) => {
+          const timeout = setTimeout(() => {
+            visemeCallback(viseme);
+            console.log(`Test viseme: ${viseme}`);
+          }, delay);
+          timeouts.push(timeout);
+        });
+      }, 2000);
+      
+      timeouts.push(repeatInterval as any);
+      
     } else {
+      // Not speaking - closed mouth
       visemeCallback(0);
     }
     
     return () => {
-      if (animationFrame) {
-        cancelAnimationFrame(animationFrame);
-      }
-      if (visemeTimer) {
-        clearTimeout(visemeTimer);
-      }
+      timeouts.forEach(timeout => clearTimeout(timeout));
     };
-  }, [isSpeaking, visemeCallback, getOutputVolume]);
+  }, [isSpeaking, visemeCallback]);
 
   return (
     <div className="flex flex-col h-screen bg-background text-foreground overflow-hidden">
