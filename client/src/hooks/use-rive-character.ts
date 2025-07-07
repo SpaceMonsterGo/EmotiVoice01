@@ -71,6 +71,16 @@ export function useRiveCharacter(containerRef: RefObject<HTMLDivElement>) {
                   console.log(`Input ${index}: name="${input.name}", type=${input.type}, value=${input.value}`);
                 });
               }
+              
+              // Check if animation is running
+              console.log('Rive instance playing:', riveInstance.isPlaying);
+              console.log('Rive instance pause:', riveInstance.isPaused);
+              
+              // Start animation loop if it's not running
+              if (!riveInstance.isPlaying) {
+                riveInstance.play();
+                console.log('Started Rive animation');
+              }
             },
             onLoadError: (error: any) => {
               console.error('Failed to load Rive character:', error);
@@ -107,12 +117,29 @@ export function useRiveCharacter(containerRef: RefObject<HTMLDivElement>) {
     if (stateMachine && stateMachine.length > 0) {
       const input = stateMachine.find((input: any) => input.name === key);
       if (input) {
-        if (typeof value === 'boolean') {
-          input.value = value;
-        } else if (typeof value === 'number') {
-          input.value = Math.round(value); // Ensure integer for visemes/emotion
+        try {
+          // Try different ways to set the value based on input type
+          if (typeof value === 'boolean') {
+            input.value = value;
+          } else if (typeof value === 'number') {
+            const numValue = Math.round(value); // Ensure integer for visemes/emotion
+            input.value = numValue;
+            
+            // Also try setting via runtimeInput if available
+            if (input.runtimeInput) {
+              input.runtimeInput.value = numValue;
+            }
+          }
+          
+          console.log(`Updated Rive input ${key} to ${value}`, {
+            name: input.name,
+            type: input.type,
+            value: input.value,
+            runtimeInput: input.runtimeInput
+          });
+        } catch (error) {
+          console.error(`Error setting Rive input ${key}:`, error);
         }
-        console.log(`Updated Rive input ${key} to ${value}`, input);
       } else {
         console.warn(`Rive input ${key} not found in state machine`, stateMachine.map((sm: any) => sm.name));
       }
