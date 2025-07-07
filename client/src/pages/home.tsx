@@ -51,8 +51,73 @@ export default function Home() {
   // Handle viseme callback from character display
   const handleVisemeCallbackReady = useCallback((callback: (viseme: number) => void) => {
     setVisemeCallback(() => callback);
-    console.log('Viseme callback ready for timestamp-based lip sync');
+    console.log('Viseme callback ready');
   }, []);
+
+  // Audio-based viseme generation using output volume
+  useEffect(() => {
+    if (!visemeCallback) return;
+    
+    let animationFrame: number;
+    let visemeTimer: NodeJS.Timeout | null = null;
+    
+    const updateViseme = () => {
+      if (isSpeaking && getOutputVolume) {
+        const outputVolume = getOutputVolume();
+        
+        if (outputVolume > 0) {
+          // Use output volume to generate visemes
+          // Output volume is typically 0-100
+          const normalizedVolume = Math.min(outputVolume / 100, 1);
+          
+          // Create variation in visemes based on volume
+          let visemeIndex: number;
+          
+          if (normalizedVolume < 0.1) {
+            visemeIndex = 0; // Closed
+          } else if (normalizedVolume < 0.3) {
+            // Low volume - subtle mouth movements
+            visemeIndex = Math.random() < 0.5 ? 1 : 2;
+          } else if (normalizedVolume < 0.6) {
+            // Medium volume - vowel sounds
+            visemeIndex = Math.floor(Math.random() * 3) + 3; // 3-5
+          } else {
+            // High volume - open mouth sounds
+            visemeIndex = Math.floor(Math.random() * 4) + 6; // 6-9
+          }
+          
+          visemeCallback(visemeIndex);
+          console.log(`Output volume: ${outputVolume}, viseme: ${visemeIndex}`);
+        } else {
+          // No volume, but still speaking - use random subtle movements
+          visemeTimer = setTimeout(() => {
+            const randomViseme = Math.floor(Math.random() * 3) + 1;
+            visemeCallback(randomViseme);
+          }, 150);
+        }
+      } else {
+        // Not speaking - closed mouth
+        visemeCallback(0);
+      }
+      
+      animationFrame = requestAnimationFrame(updateViseme);
+    };
+    
+    if (isSpeaking) {
+      updateViseme();
+    } else {
+      visemeCallback(0);
+    }
+    
+    return () => {
+      if (animationFrame) {
+        cancelAnimationFrame(animationFrame);
+      }
+      if (visemeTimer) {
+        clearTimeout(visemeTimer);
+      }
+    };
+  }, [isSpeaking, visemeCallback, getOutputVolume]);
 
   return (
     <div className="flex flex-col h-screen bg-background text-foreground overflow-hidden">
