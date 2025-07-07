@@ -87,52 +87,29 @@ export function useElevenLabsVoiceAgent() {
           // Handle different ElevenLabs message types
           if (data.type === 'conversation_initiation_metadata') {
             console.log('Conversation initiated:', data.conversation_initiation_metadata_event);
+          } else if (data.type === 'agent_response' && data.agent_response_event) {
+            // Handle agent response for precise viseme timing
+            const responseText = data.agent_response_event.agent_response;
+            if (responseText && visemeCallbackRef.current) {
+              // Clear any existing viseme timeouts to prevent overlapping
+              currentVisemeTimeouts.current.forEach(timeout => clearTimeout(timeout));
+              currentVisemeTimeouts.current = [];
+              
+              // Set speaking state
+              if (!isSpeakingRef.current) {
+                setState(prev => ({ ...prev, isSpeaking: true }));
+                isSpeakingRef.current = true;
+              }
+              
+              // Use precise timestamp-based visemes
+              generatePreciseVisemes(responseText);
+            }
           } else if (data.type === 'audio' && data.audio_event) {
-            // Clear any existing viseme timeouts to prevent overlapping
-            currentVisemeTimeouts.current.forEach(timeout => clearTimeout(timeout));
-            currentVisemeTimeouts.current = [];
-            
             // ElevenLabs Conversational AI plays audio automatically
-            // We only need to handle visemes and speaking state
+            // We don't need to handle audio here, only ensure speaking state is set
             if (!isSpeakingRef.current) {
               setState(prev => ({ ...prev, isSpeaking: true }));
               isSpeakingRef.current = true;
-            }
-            
-            // Generate visemes based on audio data without playing duplicate audio
-            const audioData = data.audio_event.audio_base_64;
-            if (audioData && visemeCallbackRef.current) {
-              // Estimate audio duration from base64 data size
-              const audioBytes = atob(audioData);
-              const estimatedDuration = audioBytes.length / (16000 * 2); // Assuming 16kHz 16-bit
-              
-              if (estimatedDuration > 0) {
-                const visemeCount = Math.floor(estimatedDuration * 10);
-                
-                for (let i = 0; i < visemeCount; i++) {
-                  const timeout = setTimeout(() => {
-                    if (visemeCallbackRef.current) {
-                      const viseme = Math.floor(Math.random() * 15) + 1;
-                      visemeCallbackRef.current(viseme);
-                    }
-                  }, (i * estimatedDuration * 1000) / visemeCount);
-                  
-                  currentVisemeTimeouts.current.push(timeout);
-                }
-                
-                // Set speaking to false after estimated duration
-                const endTimeout = setTimeout(() => {
-                  setState(prev => ({ ...prev, isSpeaking: false }));
-                  isSpeakingRef.current = false;
-                  if (visemeCallbackRef.current) {
-                    visemeCallbackRef.current(0);
-                  }
-                  // Clear the timeout array
-                  currentVisemeTimeouts.current = [];
-                }, estimatedDuration * 1000);
-                
-                currentVisemeTimeouts.current.push(endTimeout);
-              }
             }
           } else if (data.type === 'interruption') {
             setState(prev => ({ ...prev, isSpeaking: false }));
@@ -233,6 +210,122 @@ export function useElevenLabsVoiceAgent() {
       isRecording: false, 
       voiceActivity: 0 
     }));
+  }, []);
+
+  // Generate precise visemes using ElevenLabs forced alignment
+  const generatePreciseVisemes = useCallback(async (text: string) => {
+    if (!visemeCallbackRef.current || !text) return;
+
+    try {
+      // Use a default voice ID - matches ElevenLabs Conversational AI voice
+      const defaultVoiceId = 'EXAVITQu4vr4xnSDxMaL'; // Bella voice (neutral)
+      
+      console.log('Getting precise viseme alignment for:', text);
+      
+      // Get precise timing from ElevenLabs alignment API
+      const response = await fetch('/api/elevenlabs/align', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ text, voiceId: defaultVoiceId }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Alignment API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      const visemes = data.visemes;
+      
+      if (visemes && visemes.length > 0) {
+        console.log('Using ElevenLabs forced alignment with', visemes.length, 'visemes');
+        
+        // Schedule visemes with precise timing
+        const startTime = Date.now();
+        
+        visemes.forEach((viseme: any) => {
+          const delay = viseme.start; // Use direct millisecond timing
+          
+          const timeout = setTimeout(() => {
+            if (visemeCallbackRef.current) {
+              visemeCallbackRef.current(viseme.viseme);
+              console.log(`Viseme ${viseme.viseme} for char '${viseme.char}' at ${viseme.start}ms`);
+            }
+          }, delay);
+          
+          currentVisemeTimeouts.current.push(timeout);
+        });
+        
+        // Reset to neutral after sequence
+        if (visemes.length > 0) {
+          const lastViseme = visemes[visemes.length - 1];
+          const resetDelay = lastViseme.end + 100; // Small buffer
+          
+          const resetTimeout = setTimeout(() => {
+            setState(prev => ({ ...prev, isSpeaking: false }));
+            isSpeakingRef.current = false;
+            if (visemeCallbackRef.current) {
+              visemeCallbackRef.current(0); // Neutral
+              console.log('Reset to neutral viseme');
+            }
+            // Clear the timeout array
+            currentVisemeTimeouts.current = [];
+          }, resetDelay);
+          
+          currentVisemeTimeouts.current.push(resetTimeout);
+        }
+      } else {
+        // Fallback to estimated timing
+        console.log('No visemes received, using fallback');
+        generateFallbackVisemes(text);
+      }
+    } catch (error) {
+      console.error('Error with forced alignment, using fallback:', error);
+      generateFallbackVisemes(text);
+    }
+  }, []);
+
+  // Fallback viseme generation for when alignment fails
+  const generateFallbackVisemes = useCallback((text: string) => {
+    if (!visemeCallbackRef.current || !text) return;
+    
+    // Simple character-based viseme generation
+    const chars = text.split('');
+    const charDuration = 100; // 100ms per character
+    
+    chars.forEach((char, index) => {
+      const timeout = setTimeout(() => {
+        if (visemeCallbackRef.current) {
+          // Simple character to viseme mapping
+          let viseme = 0;
+          const lowerChar = char.toLowerCase();
+          
+          if ('aeiou'.includes(lowerChar)) {
+            viseme = Math.floor(Math.random() * 5) + 1; // Vowel visemes 1-5
+          } else if ('bcdfghjklmnpqrstvwxyz'.includes(lowerChar)) {
+            viseme = Math.floor(Math.random() * 5) + 6; // Consonant visemes 6-10
+          }
+          
+          visemeCallbackRef.current(viseme);
+        }
+      }, index * charDuration);
+      
+      currentVisemeTimeouts.current.push(timeout);
+    });
+    
+    // Reset after estimated duration
+    const totalDuration = chars.length * charDuration + 200;
+    const resetTimeout = setTimeout(() => {
+      setState(prev => ({ ...prev, isSpeaking: false }));
+      isSpeakingRef.current = false;
+      if (visemeCallbackRef.current) {
+        visemeCallbackRef.current(0);
+      }
+      currentVisemeTimeouts.current = [];
+    }, totalDuration);
+    
+    currentVisemeTimeouts.current.push(resetTimeout);
   }, []);
 
   // Setup voice activity detection

@@ -156,47 +156,47 @@ export class ElevenLabsAligner {
     return visemes;
   }
 
-  // Convert character to viseme using Rive specification
-  // 0=Neutral, 1=F, 2=M, 3=O, 4=U, 5=E, 6=AI, 7=CH, 8=S, 9=L
+  // Convert character to viseme using Rive specification  
+  // Based on standard viseme mapping: 0=Neutral, 1-9=Different mouth shapes
   private charToViseme(char: string): number {
     const charToVisemeMap: { [key: string]: number } = {
-      // Vowels
-      'a': 6, // AI sound
-      'e': 5, // E sound
-      'i': 6, // AI sound (closest match)
-      'o': 3, // O sound
-      'u': 4, // U sound
-      'y': 6, // AI sound
+      // Vowels - distinct mouth shapes
+      'a': 1, // Open mouth (A sound)
+      'e': 2, // Medium open (E sound)  
+      'i': 3, // Narrow opening (I sound)
+      'o': 4, // Rounded lips (O sound)
+      'u': 5, // Very rounded (U sound)
+      'y': 3, // Similar to I
       
-      // Consonants
-      'f': 1, 'v': 1, // F sound (lip-teeth)
-      'b': 2, 'p': 2, 'm': 2, // M sound (lip closure)
-      'w': 4, // U sound (lip rounding)
+      // Consonants - lip/tongue positions
+      'f': 6, 'v': 6, // Lip-teeth contact
+      'b': 7, 'p': 7, 'm': 7, // Lip closure
+      'w': 5, // Lip rounding (like U)
       
-      // Dental/alveolar (approximate with S)
+      // Dental/alveolar sounds
       't': 8, 'd': 8, 'n': 8, 's': 8, 'z': 8,
-      'th': 8, // S sound approximation
+      'th': 8, // Tongue-teeth
       
-      // Postalveolar (CH sound)
-      'c': 7, 'ch': 7, 'sh': 7, 'j': 7,
+      // Postalveolar sounds  
+      'c': 9, 'ch': 9, 'sh': 9, 'j': 9, 'g': 9, 'k': 9,
       
-      // Lateral/rhotic (L sound)
-      'l': 9, 'r': 9,
+      // Lateral/rhotic
+      'l': 2, 'r': 2, // Tongue movement
       
-      // Velar (O sound approximation)
-      'k': 3, 'g': 3, 'q': 3,
+      // Other consonants
+      'h': 1, // Slight opening
+      'x': 8, 'q': 9,
       
-      // Other consonants (default mappings)
-      'h': 5, // E sound
-      'x': 8, // S sound
+      // Punctuation and whitespace - neutral
+      ' ': 0, '.': 0, ',': 0, '!': 0, '?': 0, ':': 0, ';': 0,
+      '\n': 0, '\t': 0,
       
-      // Punctuation and numbers default to neutral
-      '.': 0, ',': 0, '!': 0, '?': 0, ':': 0, ';': 0,
-      '0': 3, '1': 6, '2': 8, '3': 3, '4': 1, '5': 1,
-      '6': 8, '7': 8, '8': 5, '9': 6
+      // Numbers - map to vowel-like shapes
+      '0': 4, '1': 1, '2': 2, '3': 3, '4': 1, '5': 2,
+      '6': 3, '7': 2, '8': 4, '9': 4
     };
     
-    return charToVisemeMap[char] || 0; // Default to neutral
+    return charToVisemeMap[char] || 1; // Default to slight opening instead of neutral
   }
 
   // Get available voices for alignment
