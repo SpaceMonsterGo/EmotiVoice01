@@ -36,8 +36,8 @@ export function useRiveCharacter(containerRef: RefObject<HTMLDivElement>) {
 
         // Try to load the Rive file with better error handling
         try {
-          // Import the Rive file as an asset using Vite's asset handling with cache busting
-          const riveUrl = `/src/assets/visemes.riv?v=${Date.now()}`;
+          // Load from public directory for production compatibility
+          const riveUrl = `/animations/visemes.riv?v=${Date.now()}`;
           const response = await fetch(riveUrl);
           
           if (!response.ok) {
@@ -84,11 +84,15 @@ export function useRiveCharacter(containerRef: RefObject<HTMLDivElement>) {
             },
             onLoadError: (error: any) => {
               console.error('Failed to load Rive character:', error);
+              console.error('Rive file URL attempted:', riveUrl);
               // Fall back to placeholder - SVG character will be shown instead
             }
           });
         } catch (error) {
           console.error('Error loading Rive file:', error);
+          console.error('Fetch URL attempted:', riveUrl);
+          console.error('Response status:', response?.status);
+          console.error('Response ok:', response?.ok);
           // Fall back to SVG character
         }
 

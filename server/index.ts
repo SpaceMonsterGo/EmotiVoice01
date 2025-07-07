@@ -1,4 +1,5 @@
 import express, { type Request, Response, NextFunction } from "express";
+import path from "path";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 
@@ -37,6 +38,16 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  // Add static file serving for binary files (like .riv) before routes
+  app.use('/animations', express.static(path.join(import.meta.dirname, "../public/animations"), {
+    setHeaders: (res, filePath) => {
+      if (filePath.endsWith('.riv')) {
+        res.setHeader('Content-Type', 'application/octet-stream');
+        res.setHeader('Cache-Control', 'public, max-age=31536000');
+      }
+    }
+  }));
+
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
