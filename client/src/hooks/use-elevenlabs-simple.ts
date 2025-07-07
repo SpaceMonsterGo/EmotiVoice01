@@ -318,13 +318,14 @@ export function useElevenLabsSimple() {
         // Send conversation initiation according to ElevenLabs documentation
         if (ws.readyState === WebSocket.OPEN) {
           const initMessage = {
-            type: 'conversation_initiation_client_data',
-            conversation_config_override: {
-              agent: {
-                first_message: "Hello! I'm your AI voice assistant. How can I help you today?",
-                language: "en"
-              }
-            }
+            type: 'conversation_initiation_client_data'
+            // Note: conversation_config_override commented out to use agent's default settings
+            // conversation_config_override: {
+            //   agent: {
+            //     first_message: "Hello! I'm your AI voice assistant. How can I help you today?",
+            //     language: "en"
+            //   }
+            // }
           };
           console.log('Sending conversation initiation:', initMessage);
           ws.send(JSON.stringify(initMessage));

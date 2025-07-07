@@ -158,6 +158,7 @@ Changelog:
   - Improved conversation initiation with proper config override structure
   - Added better error handling and interruption management with viseme reset
   - Enhanced logging for all ElevenLabs protocol message types
+  - Commented out conversation_config_override to use agent's default configuration
 
 ## User Preferences
 
