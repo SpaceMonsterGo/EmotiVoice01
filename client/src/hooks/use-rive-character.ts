@@ -63,6 +63,14 @@ export function useRiveCharacter(containerRef: RefObject<HTMLDivElement>) {
               const sm = riveInstance.stateMachineInputs('State Machine 1');
               setStateMachine(sm);
               console.log('State machine inputs:', sm);
+              
+              // Log the actual input names to debug
+              if (sm && sm.length > 0) {
+                console.log('Available input names:', sm.map((input: any) => input.name));
+                sm.forEach((input: any, index: number) => {
+                  console.log(`Input ${index}: name="${input.name}", type=${input.type}, value=${input.value}`);
+                });
+              }
             },
             onLoadError: (error: any) => {
               console.error('Failed to load Rive character:', error);
