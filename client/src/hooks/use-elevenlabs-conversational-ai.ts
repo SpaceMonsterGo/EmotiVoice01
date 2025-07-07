@@ -32,6 +32,12 @@ export function useElevenLabsConversationalAI() {
 
   // Connect to ElevenLabs Conversational AI
   const connect = useCallback(async () => {
+    // Close any existing connection first
+    if (websocketRef.current) {
+      websocketRef.current.close();
+      websocketRef.current = null;
+    }
+
     try {
       setState(prev => ({ ...prev, isProcessing: true, error: null }));
 
@@ -173,6 +179,19 @@ export function useElevenLabsConversationalAI() {
         }
         break;
 
+      case 'client_tool_call':
+        // Handle emotion detection and other tool calls
+        const toolCall = data.client_tool_call;
+        if (toolCall?.tool_name === 'emotion_detector') {
+          const emotion = toolCall.parameters?.emotion_detected;
+          console.log('Emotion detected:', emotion);
+          // Update character emotion if needed
+          if (emotion === 'listening' && visemeCallbackRef.current) {
+            // Could update emotion state here
+          }
+        }
+        break;
+
       default:
         console.log('Unknown message type:', data.type);
     }
@@ -180,8 +199,15 @@ export function useElevenLabsConversationalAI() {
 
   // Start listening (microphone input)
   const startListening = useCallback(async () => {
+    // Prevent multiple simultaneous connections
+    if (state.isProcessing || state.isConnected) {
+      console.log('Already connecting or connected, ignoring duplicate request');
+      return;
+    }
+
     try {
       console.log('Starting microphone access...');
+      setState(prev => ({ ...prev, isProcessing: true }));
       
       // First get microphone permission
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -196,26 +222,26 @@ export function useElevenLabsConversationalAI() {
       streamRef.current = stream;
       console.log('Microphone access granted');
 
-      // If not connected, connect now
-      if (!state.isConnected || !websocketRef.current) {
-        setState(prev => ({ ...prev, isListening: true }));
-        await connect();
-        // Wait a bit for connection to establish
-        setTimeout(() => {
-          if (websocketRef.current?.readyState === WebSocket.OPEN) {
-            startAudioProcessing();
-          }
-        }, 1000);
-      } else {
-        setState(prev => ({ ...prev, isListening: true }));
-        startAudioProcessing();
-      }
+      // Always connect fresh
+      setState(prev => ({ ...prev, isListening: true }));
+      await connect();
+      
+      // Wait for connection to establish
+      setTimeout(() => {
+        if (websocketRef.current?.readyState === WebSocket.OPEN) {
+          startAudioProcessing();
+        }
+      }, 1000);
 
     } catch (error) {
       console.error('Failed to start listening:', error);
-      setState(prev => ({ ...prev, error: 'Failed to access microphone' }));
+      setState(prev => ({ 
+        ...prev, 
+        error: 'Failed to access microphone',
+        isProcessing: false 
+      }));
     }
-  }, [state.isConnected, connect]);
+  }, [state.isProcessing, state.isConnected, connect]);
 
   // Separate function for audio processing
   const startAudioProcessing = useCallback(() => {

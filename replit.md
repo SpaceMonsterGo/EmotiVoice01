@@ -116,6 +116,10 @@ Changelog:
   - Added real-time PCM audio streaming to ElevenLabs Conversational AI
   - Fixed authentication by removing API key exposure on client side
   - Character now animates with proper real-time audio stream integration
+  - Fixed audio playback with proper PCM16 to Web Audio conversion
+  - Added synchronized viseme generation for natural lip-sync animation
+  - Implemented ping/pong heartbeat and emotion detection handling
+  - Prevented duplicate connections and improved connection management
 
 ## User Preferences
 
