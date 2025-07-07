@@ -134,6 +134,10 @@ Changelog:
   - Implemented ElevenLabs forced alignment using TTS WebSocket with character-level timestamps
   - Added precise viseme timing with /api/elevenlabs/align endpoint for perfect lip sync
   - Integrated real-time character-to-viseme conversion matching Rive specification
+- July 07, 2025: UI improvements for cleaner interaction:
+  - Removed distracting "Listening" text and flashing colored progress bar
+  - Simplified character animations to only show activity during AI speech
+  - Cleaned up status indicators to reduce visual noise during conversations
 
 ## User Preferences
 

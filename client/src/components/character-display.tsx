@@ -120,7 +120,6 @@ export function CharacterDisplay({
                 rx="8" 
                 ry={12 * eyeExpression.scaleY}
                 fill="url(#eyeGradient)"
-                className={isListening ? 'animate-pulse' : ''}
               />
               <ellipse 
                 cx="125" 
@@ -128,7 +127,6 @@ export function CharacterDisplay({
                 rx="8" 
                 ry={12 * eyeExpression.scaleY}
                 fill="url(#eyeGradient)"
-                className={isListening ? 'animate-pulse' : ''}
               />
               
               {/* Eye highlights */}
@@ -173,10 +171,9 @@ export function CharacterDisplay({
         )}
       </div>
       
-      {/* Voice Activity Ring */}
+      {/* Voice Activity Ring - Only show when speaking */}
       <div className={`absolute inset-0 rounded-full border-4 transition-all duration-300 ${
-        isSpeaking ? 'border-green-500/50 opacity-100 animate-pulse' : 
-        isListening ? 'border-blue-500/50 opacity-100 animate-pulse' : 'border-transparent opacity-0'
+        isSpeaking ? 'border-green-500/50 opacity-100 animate-pulse' : 'border-transparent opacity-0'
       }`}></div>
       
       {/* Emotional State Indicator */}
@@ -190,12 +187,10 @@ export function CharacterDisplay({
       {/* Speaking Status */}
       <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex items-center space-x-2 bg-muted/80 backdrop-blur-sm px-4 py-2 rounded-full">
         <div className={`w-2 h-2 rounded-full transition-colors duration-200 ${
-          isListening ? 'bg-green-500 animate-pulse' :
-          isSpeaking ? 'bg-blue-500 animate-pulse' :
-          'bg-muted-foreground'
+          isSpeaking ? 'bg-blue-500 animate-pulse' : 'bg-muted-foreground'
         }`}></div>
         <span className="text-sm text-muted-foreground">
-          {isListening ? 'Listening...' : isSpeaking ? 'Speaking...' : 'Ready'}
+          {isSpeaking ? 'Speaking...' : 'Ready'}
         </span>
       </div>
     </div>

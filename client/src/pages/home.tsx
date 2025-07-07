@@ -96,20 +96,8 @@ export default function Home() {
                 
                 <div className="text-center">
                   <p className="text-sm text-gray-300">
-                    {isListening ? 'Listening... Click to stop' :
-                     isSpeaking ? 'AI is speaking...' :
-                     'Click to start conversation'}
+                    {isSpeaking ? 'AI is speaking...' : 'Click to start conversation'}
                   </p>
-                  
-                  {/* Voice Activity Indicator */}
-                  {isListening && (
-                    <div className="mt-2 w-32 h-2 bg-gray-700 rounded-full overflow-hidden">
-                      <div 
-                        className="h-full bg-gradient-to-r from-green-400 to-blue-500 transition-all duration-100 animate-pulse"
-                        style={{ width: `${isListening ? 80 : 0}%` }}
-                      />
-                    </div>
-                  )}
                 </div>
               </div>
               
