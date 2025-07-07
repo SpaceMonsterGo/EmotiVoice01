@@ -161,7 +161,9 @@ export function useElevenLabsSimple() {
           break;
 
         case 'audio':
-          const audioData = data.audio_event.audio_base_64;
+          const audioData = data.audio_event?.audio_base_64;
+          console.log('Received audio event, data length:', audioData?.length || 0);
+          
           if (audioData) {
             setState(prev => ({ ...prev, isSpeaking: true }));
             
@@ -173,15 +175,17 @@ export function useElevenLabsSimple() {
                 audioArray[i] = audioBytes.charCodeAt(i);
               }
               
+              console.log('Audio data converted, bytes:', audioArray.length);
+              
               // Store audio data for potential forced alignment
               currentAudioDataRef.current = audioArray;
               
-              // Create audio context and play PCM16 data
-              if (!audioContextRef.current) {
-                audioContextRef.current = new AudioContext();
+              // Create or reuse audio context
+              let audioContext = audioContextRef.current;
+              if (!audioContext || audioContext.state === 'closed') {
+                audioContext = new AudioContext();
+                audioContextRef.current = audioContext;
               }
-              
-              const audioContext = audioContextRef.current;
               
               // PCM16 to Float32 conversion
               const pcmData = new Int16Array(audioArray.buffer);
@@ -198,15 +202,16 @@ export function useElevenLabsSimple() {
               
               // Only play audio - visemes will be generated from agent_response text
               const duration = audioBuffer.duration;
-              console.log('Playing audio, duration:', duration);
+              console.log('Playing audio, duration:', duration, 'seconds');
               
               source.onended = () => {
                 console.log('Audio playback ended');
                 setState(prev => ({ ...prev, isSpeaking: false }));
               };
               
-              // Resume audio context if suspended
+              // Ensure audio context is resumed before playing
               if (audioContext.state === 'suspended') {
+                console.log('Resuming suspended audio context');
                 audioContext.resume().then(() => {
                   source.start();
                   console.log('Audio started after resume');
@@ -219,6 +224,8 @@ export function useElevenLabsSimple() {
               console.error('Audio playback failed:', error);
               setState(prev => ({ ...prev, isSpeaking: false }));
             }
+          } else {
+            console.log('No audio data in audio event');
           }
           break;
 
@@ -363,28 +370,33 @@ export function useElevenLabsSimple() {
       audioContextRef.current = audioContext;
       
       const source = audioContext.createMediaStreamSource(stream);
-      const processor = audioContext.createScriptProcessor(4096, 1, 1);
       
-      source.connect(processor);
-      processor.connect(audioContext.destination);
+      // Use MediaRecorder for more reliable audio streaming (replaces deprecated ScriptProcessor)
+      const mediaRecorder = new MediaRecorder(stream, {
+        audioBitsPerSecond: 16000,
+        mimeType: 'audio/webm;codecs=pcm'
+      });
+      mediaRecorderRef.current = mediaRecorder;
       
-      processor.onaudioprocess = (event) => {
-        if (ws.readyState === WebSocket.OPEN && state.isConnected) {
-          const inputBuffer = event.inputBuffer.getChannelData(0);
-          
-          // Convert float32 to PCM16 format as expected by ElevenLabs
-          const pcm16Buffer = new Int16Array(inputBuffer.length);
-          for (let i = 0; i < inputBuffer.length; i++) {
-            pcm16Buffer[i] = Math.max(-32768, Math.min(32767, inputBuffer[i] * 32768));
-          }
-          
-          // Convert to base64 and send according to ElevenLabs protocol
-          const base64Audio = btoa(String.fromCharCode(...new Uint8Array(pcm16Buffer.buffer)));
-          ws.send(JSON.stringify({
-            user_audio_chunk: base64Audio
-          }));
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0 && ws.readyState === WebSocket.OPEN && state.isConnected) {
+          // Convert blob to PCM16 for ElevenLabs
+          const reader = new FileReader();
+          reader.onload = () => {
+            const arrayBuffer = reader.result as ArrayBuffer;
+            const uint8Array = new Uint8Array(arrayBuffer);
+            const base64Audio = btoa(String.fromCharCode(...uint8Array));
+            
+            ws.send(JSON.stringify({
+              user_audio_chunk: base64Audio
+            }));
+          };
+          reader.readAsArrayBuffer(event.data);
         }
       };
+      
+      // Start recording in 250ms chunks for real-time streaming
+      mediaRecorder.start(250);
       
       console.log('Audio processing started with PCM16 format');
       setState(prev => ({ ...prev, isListening: true }));
@@ -398,6 +410,11 @@ export function useElevenLabsSimple() {
 
   // Stop conversation
   const stopConversation = useCallback(() => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+      mediaRecorderRef.current = null;
+    }
+    
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop());
       streamRef.current = null;
@@ -408,10 +425,12 @@ export function useElevenLabsSimple() {
       websocketRef.current = null;
     }
 
-    if (audioContextRef.current) {
+    if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
       audioContextRef.current.close();
       audioContextRef.current = null;
     }
+    
+    connectionAttemptRef.current = false;
     
     setState(prev => ({ 
       ...prev, 

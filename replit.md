@@ -159,6 +159,12 @@ Changelog:
   - Added better error handling and interruption management with viseme reset
   - Enhanced logging for all ElevenLabs protocol message types
   - Commented out conversation_config_override to use agent's default configuration
+- July 07, 2025: Fixed audio playback and deprecated ScriptProcessorNode:
+  - Replaced deprecated ScriptProcessorNode with MediaRecorder for audio streaming
+  - Enhanced audio event handling with better error logging and state management
+  - Fixed audio context management to prevent audio playback issues
+  - Added proper cleanup for MediaRecorder in stop conversation function
+  - Improved audio debugging with detailed logging for troubleshooting
 
 ## User Preferences
 
