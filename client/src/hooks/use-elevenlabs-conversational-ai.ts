@@ -147,6 +147,19 @@ export function useElevenLabsConversationalAI() {
         stopCurrentAudio();
         break;
 
+      case 'ping':
+        // Respond to ping with pong to keep connection alive
+        const pingEvent = data.ping_event;
+        if (pingEvent && websocketRef.current) {
+          const pongMessage = {
+            type: "pong",
+            event_id: pingEvent.event_id
+          };
+          websocketRef.current.send(JSON.stringify(pongMessage));
+          console.log('Sent pong response for ping:', pingEvent.event_id);
+        }
+        break;
+
       default:
         console.log('Unknown message type:', data.type);
     }
@@ -262,44 +275,47 @@ export function useElevenLabsConversationalAI() {
   // Play audio response
   const playAudioResponse = useCallback(async (base64Audio: string) => {
     try {
-      // Convert base64 to audio buffer
+      console.log('Processing audio data, length:', base64Audio.length);
+      
+      // Convert base64 to PCM audio buffer
       const binaryString = atob(base64Audio);
       const bytes = new Uint8Array(binaryString.length);
       for (let i = 0; i < binaryString.length; i++) {
         bytes[i] = binaryString.charCodeAt(i);
       }
 
-      const audioBlob = new Blob([bytes], { type: 'audio/mpeg' });
-      const audioUrl = URL.createObjectURL(audioBlob);
-      const audio = new Audio(audioUrl);
+      // Create audio context if not exists
+      if (!audioContextRef.current) {
+        audioContextRef.current = new AudioContext();
+      }
 
-      // Generate visemes during playback
-      audio.onplay = () => {
-        if (visemeCallbackRef.current) {
-          // Simple viseme animation
-          const duration = audio.duration || 2;
-          const visemeCount = Math.floor(duration * 10);
-          
-          for (let i = 0; i < visemeCount; i++) {
-            setTimeout(() => {
-              if (visemeCallbackRef.current) {
-                const viseme = Math.floor(Math.random() * 15) + 1;
-                visemeCallbackRef.current(viseme);
-              }
-            }, (i * duration * 1000) / visemeCount);
-          }
-        }
-      };
+      const audioContext = audioContextRef.current;
+      
+      // Convert PCM16 to AudioBuffer
+      const audioBuffer = audioContext.createBuffer(1, bytes.length / 2, 16000);
+      const channelData = audioBuffer.getChannelData(0);
+      
+      // Convert PCM16 bytes to float32
+      for (let i = 0; i < channelData.length; i++) {
+        const sample = (bytes[i * 2] | (bytes[i * 2 + 1] << 8));
+        channelData[i] = sample < 32768 ? sample / 32768 : (sample - 65536) / 32768;
+      }
 
-      audio.onended = () => {
+      // Play the audio
+      const source = audioContext.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(audioContext.destination);
+      
+      source.onended = () => {
+        console.log('Audio playback ended');
         setState(prev => ({ ...prev, isSpeaking: false }));
         if (visemeCallbackRef.current) {
           visemeCallbackRef.current(0);
         }
-        URL.revokeObjectURL(audioUrl);
       };
 
-      await audio.play();
+      console.log('Starting audio playback...');
+      source.start();
 
     } catch (error) {
       console.error('Error playing audio:', error);
@@ -313,25 +329,6 @@ export function useElevenLabsConversationalAI() {
     if (visemeCallbackRef.current) {
       visemeCallbackRef.current(0);
     }
-  }, []);
-
-  // Toggle listening
-  const toggleListening = useCallback(() => {
-    if (state.isListening) {
-      stopListening();
-    } else {
-      startListening();
-    }
-  }, [state.isListening, startListening, stopListening]);
-
-  // Set viseme callback
-  const setVisemeCallback = useCallback((callback: (viseme: number) => void) => {
-    visemeCallbackRef.current = callback;
-  }, []);
-
-  // Clear error
-  const clearError = useCallback(() => {
-    setState(prev => ({ ...prev, error: null }));
   }, []);
 
   // Disconnect
@@ -348,7 +345,30 @@ export function useElevenLabsConversationalAI() {
       isSpeaking: false,
       conversationId: null
     }));
-  }, [stopListening]);
+  }, []);
+
+  // Toggle listening
+  const toggleListening = useCallback(() => {
+    if (state.isListening) {
+      console.log('Stopping conversation...');
+      disconnect();
+    } else {
+      console.log('Starting conversation...');
+      startListening();
+    }
+  }, [state.isListening, startListening, disconnect]);
+
+  // Set viseme callback
+  const setVisemeCallback = useCallback((callback: (viseme: number) => void) => {
+    visemeCallbackRef.current = callback;
+  }, []);
+
+  // Clear error
+  const clearError = useCallback(() => {
+    setState(prev => ({ ...prev, error: null }));
+  }, []);
+
+
 
   // Cleanup on unmount
   useEffect(() => {
