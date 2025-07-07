@@ -67,12 +67,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(500).json({ error: 'ElevenLabs API key not configured' });
       }
       
-      // Generate a signed URL for the ElevenLabs conversational AI
+      // Generate a properly authenticated signed URL for the ElevenLabs conversational AI
       const agentId = process.env.ELEVENLABS_AGENT_ID;
       if (!agentId) {
         return res.status(500).json({ error: 'ElevenLabs Agent ID not configured' });
       }
-      const signedUrl = `wss://api.elevenlabs.io/v1/convai/conversation?agent_id=${agentId}`;
+      
+      // Include API key in the WebSocket URL for authentication as per ElevenLabs documentation
+      const signedUrl = `wss://api.elevenlabs.io/v1/convai/conversation?agent_id=${agentId}&xi-api-key=${apiKey}`;
       
       res.json({ 
         signedUrl,

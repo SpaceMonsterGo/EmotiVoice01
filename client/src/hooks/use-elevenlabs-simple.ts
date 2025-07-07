@@ -152,9 +152,10 @@ export function useElevenLabsSimple() {
       
       switch (data.type) {
         case 'conversation_initiation_metadata':
+          console.log('Conversation initiated, metadata received');
           setState(prev => ({ 
             ...prev, 
-            conversationId: data.conversation_initiation_metadata_event.conversation_id,
+            conversationId: data.conversation_initiation_metadata_event?.conversation_id,
             isConnected: true 
           }));
           break;
@@ -255,26 +256,36 @@ export function useElevenLabsSimple() {
           break;
 
         case 'interruption':
-          console.log('Audio interruption detected');
+          console.log('Audio interruption detected - stopping speech');
           setState(prev => ({ ...prev, isSpeaking: false }));
+          // Reset visemes to neutral on interruption
+          if (visemeCallbackRef.current) {
+            visemeCallbackRef.current(0);
+          }
           break;
 
         case 'agent_response_correction':
-          console.log('Agent response correction:', data.agent_response_correction_event);
+          console.log('Agent response correction received:', data.agent_response_correction_event);
+          break;
+          
+        case 'internal_tentative_agent_response':
+          // Handle tentative responses - these are preview responses before final
+          console.log('Received tentative agent response:', data.internal_tentative_agent_response_event?.tentative_agent_response);
           break;
 
         case 'ping':
-          // Respond to ping to keep connection alive
+          // Respond to ping to keep connection alive - critical for ElevenLabs protocol
+          console.log('Received ping, sending pong');
           if (websocketRef.current?.readyState === WebSocket.OPEN) {
             websocketRef.current.send(JSON.stringify({
               type: 'pong',
-              event_id: data.ping_event.event_id
+              event_id: data.ping_event?.event_id || 'default-event-id'
             }));
           }
           break;
 
         default:
-          console.log('Unknown message type:', data.type);
+          console.log('Unknown message type received:', data.type, data);
       }
     } catch (error) {
       console.error('Error handling WebSocket message:', error);
@@ -304,11 +315,19 @@ export function useElevenLabsSimple() {
       ws.onopen = () => {
         console.log('WebSocket connected, sending conversation initiation');
         connectionAttemptRef.current = false;
-        // Send conversation initiation - only once per connection
+        // Send conversation initiation according to ElevenLabs documentation
         if (ws.readyState === WebSocket.OPEN) {
-          ws.send(JSON.stringify({
-            type: 'conversation_initiation_client_data'
-          }));
+          const initMessage = {
+            type: 'conversation_initiation_client_data',
+            conversation_config_override: {
+              agent: {
+                first_message: "Hello! I'm your AI voice assistant. How can I help you today?",
+                language: "en"
+              }
+            }
+          };
+          console.log('Sending conversation initiation:', initMessage);
+          ws.send(JSON.stringify(initMessage));
         }
       };
       
@@ -349,16 +368,16 @@ export function useElevenLabsSimple() {
       processor.connect(audioContext.destination);
       
       processor.onaudioprocess = (event) => {
-        if (ws.readyState === WebSocket.OPEN) {
+        if (ws.readyState === WebSocket.OPEN && state.isConnected) {
           const inputBuffer = event.inputBuffer.getChannelData(0);
           
-          // Convert float32 to PCM16
+          // Convert float32 to PCM16 format as expected by ElevenLabs
           const pcm16Buffer = new Int16Array(inputBuffer.length);
           for (let i = 0; i < inputBuffer.length; i++) {
             pcm16Buffer[i] = Math.max(-32768, Math.min(32767, inputBuffer[i] * 32768));
           }
           
-          // Convert to base64 and send
+          // Convert to base64 and send according to ElevenLabs protocol
           const base64Audio = btoa(String.fromCharCode(...new Uint8Array(pcm16Buffer.buffer)));
           ws.send(JSON.stringify({
             user_audio_chunk: base64Audio

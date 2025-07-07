@@ -151,6 +151,13 @@ Changelog:
   - Improved WebSocket error handling and connection state management
   - Added detailed logging to track message events and prevent duplicate processing
   - Now only generates visemes from agent_response text events for precise lip sync
+- July 07, 2025: ElevenLabs protocol compliance improvements:
+  - Fixed signed URL generation to include proper API key authentication
+  - Enhanced WebSocket message handling to match official ElevenLabs documentation
+  - Added support for tentative agent responses and improved ping/pong handling
+  - Improved conversation initiation with proper config override structure
+  - Added better error handling and interruption management with viseme reset
+  - Enhanced logging for all ElevenLabs protocol message types
 
 ## User Preferences
 
