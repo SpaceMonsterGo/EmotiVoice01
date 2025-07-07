@@ -69,33 +69,56 @@ export function useElevenLabsSimple() {
           if (audioData) {
             setState(prev => ({ ...prev, isSpeaking: true }));
             
-            // Play the audio
-            const audioBytes = atob(audioData);
-            const audioArray = new Uint8Array(audioBytes.length);
-            for (let i = 0; i < audioBytes.length; i++) {
-              audioArray[i] = audioBytes.charCodeAt(i);
-            }
-            
-            const audioBlob = new Blob([audioArray], { type: 'audio/wav' });
-            const audioUrl = URL.createObjectURL(audioBlob);
-            const audio = new Audio(audioUrl);
-            
-            audio.onplay = () => {
-              const duration = audio.duration || 2;
+            try {
+              // Convert base64 to PCM16 audio buffer
+              const audioBytes = atob(audioData);
+              const audioArray = new Uint8Array(audioBytes.length);
+              for (let i = 0; i < audioBytes.length; i++) {
+                audioArray[i] = audioBytes.charCodeAt(i);
+              }
+              
+              // Create audio context and play PCM16 data
+              if (!audioContextRef.current) {
+                audioContextRef.current = new AudioContext();
+              }
+              
+              const audioContext = audioContextRef.current;
+              
+              // PCM16 to Float32 conversion
+              const pcmData = new Int16Array(audioArray.buffer);
+              const audioBuffer = audioContext.createBuffer(1, pcmData.length, 16000);
+              const channelData = audioBuffer.getChannelData(0);
+              
+              for (let i = 0; i < pcmData.length; i++) {
+                channelData[i] = pcmData[i] / 32768.0; // Convert to float32
+              }
+              
+              const source = audioContext.createBufferSource();
+              source.buffer = audioBuffer;
+              source.connect(audioContext.destination);
+              
+              source.onended = () => {
+                setState(prev => ({ ...prev, isSpeaking: false }));
+              };
+              
+              // Generate visemes during playback
+              const duration = audioBuffer.duration;
               generateVisemes(duration);
-            };
-            
-            audio.onended = () => {
+              
+              source.start();
+            } catch (error) {
+              console.error('Audio playback failed:', error);
               setState(prev => ({ ...prev, isSpeaking: false }));
-              URL.revokeObjectURL(audioUrl);
-            };
-            
-            audio.play().catch(console.error);
+            }
           }
           break;
 
         case 'user_transcript':
-          // User speech was transcribed - no action needed
+          console.log('User transcript received:', data.user_transcription_event?.user_transcript);
+          break;
+
+        case 'agent_response':
+          console.log('Agent response:', data.agent_response_event?.agent_response);
           break;
 
         case 'ping':
@@ -199,6 +222,11 @@ export function useElevenLabsSimple() {
     if (websocketRef.current) {
       websocketRef.current.close();
       websocketRef.current = null;
+    }
+
+    if (audioContextRef.current) {
+      audioContextRef.current.close();
+      audioContextRef.current = null;
     }
     
     setState(prev => ({ 
