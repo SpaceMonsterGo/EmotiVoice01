@@ -165,6 +165,9 @@ Changelog:
   - Fixed audio context management to prevent audio playback issues
   - Added proper cleanup for MediaRecorder in stop conversation function
   - Improved audio debugging with detailed logging for troubleshooting
+  - Reverted to ScriptProcessorNode temporarily as MediaRecorder doesn't provide required PCM16 format
+  - Enhanced conversation state management to prevent timeouts after first message
+  - Added proper state transitions for user transcript and agent response events
 
 ## User Preferences
 

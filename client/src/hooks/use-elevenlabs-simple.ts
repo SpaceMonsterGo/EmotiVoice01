@@ -240,6 +240,9 @@ export function useElevenLabsSimple() {
               type: 'user',
               timestamp: Date.now()
             };
+            
+            // Set typing state when user speaks
+            setState(prev => ({ ...prev, isSpeaking: false }));
           }
           break;
 
@@ -249,12 +252,15 @@ export function useElevenLabsSimple() {
           console.log('Agent response:', agentText, 'Event ID:', eventId);
           
           // Store agent response for potential forced alignment
-          if (agentText) {
+          if (agentText && agentText.trim()) {
             currentTranscriptRef.current = {
               text: agentText,
               type: 'agent',
               timestamp: Date.now()
             };
+            
+            // Set typing state when agent is formulating response
+            setState(prev => ({ ...prev, isSpeaking: false }));
             
             // Use forced alignment for precise viseme timing
             console.log('Generating visemes for agent response');
@@ -371,32 +377,30 @@ export function useElevenLabsSimple() {
       
       const source = audioContext.createMediaStreamSource(stream);
       
-      // Use MediaRecorder for more reliable audio streaming (replaces deprecated ScriptProcessor)
-      const mediaRecorder = new MediaRecorder(stream, {
-        audioBitsPerSecond: 16000,
-        mimeType: 'audio/webm;codecs=pcm'
-      });
-      mediaRecorderRef.current = mediaRecorder;
+      // Use ScriptProcessor temporarily until we can implement proper WebRTC audio streaming
+      // MediaRecorder with WebM doesn't provide the raw PCM16 format ElevenLabs expects
+      const processor = audioContext.createScriptProcessor(4096, 1, 1);
       
-      mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0 && ws.readyState === WebSocket.OPEN && state.isConnected) {
-          // Convert blob to PCM16 for ElevenLabs
-          const reader = new FileReader();
-          reader.onload = () => {
-            const arrayBuffer = reader.result as ArrayBuffer;
-            const uint8Array = new Uint8Array(arrayBuffer);
-            const base64Audio = btoa(String.fromCharCode(...uint8Array));
-            
-            ws.send(JSON.stringify({
-              user_audio_chunk: base64Audio
-            }));
-          };
-          reader.readAsArrayBuffer(event.data);
+      source.connect(processor);
+      processor.connect(audioContext.destination);
+      
+      processor.onaudioprocess = (event) => {
+        if (ws.readyState === WebSocket.OPEN && state.isConnected) {
+          const inputBuffer = event.inputBuffer.getChannelData(0);
+          
+          // Convert float32 to PCM16 format as expected by ElevenLabs
+          const pcm16Buffer = new Int16Array(inputBuffer.length);
+          for (let i = 0; i < inputBuffer.length; i++) {
+            pcm16Buffer[i] = Math.max(-32768, Math.min(32767, inputBuffer[i] * 32768));
+          }
+          
+          // Convert to base64 and send according to ElevenLabs protocol
+          const base64Audio = btoa(String.fromCharCode(...new Uint8Array(pcm16Buffer.buffer)));
+          ws.send(JSON.stringify({
+            user_audio_chunk: base64Audio
+          }));
         }
       };
-      
-      // Start recording in 250ms chunks for real-time streaming
-      mediaRecorder.start(250);
       
       console.log('Audio processing started with PCM16 format');
       setState(prev => ({ ...prev, isListening: true }));
@@ -410,11 +414,6 @@ export function useElevenLabsSimple() {
 
   // Stop conversation
   const stopConversation = useCallback(() => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      mediaRecorderRef.current.stop();
-      mediaRecorderRef.current = null;
-    }
-    
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop());
       streamRef.current = null;
