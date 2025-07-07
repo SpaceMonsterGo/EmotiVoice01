@@ -35,7 +35,7 @@ export interface ElevenLabsVoice {
 // Get precise viseme timing using ElevenLabs forced alignment
 export async function getVisemeAlignment(text: string, voiceId: string): Promise<VisemeTimestamp[]> {
   try {
-    const response = await apiRequest<AlignmentResponse>('/api/elevenlabs/align', {
+    const response = await fetch('/api/elevenlabs/align', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -43,7 +43,12 @@ export async function getVisemeAlignment(text: string, voiceId: string): Promise
       body: JSON.stringify({ text, voiceId }),
     });
 
-    return response.visemes;
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data: AlignmentResponse = await response.json();
+    return data.visemes;
   } catch (error) {
     console.error('Error getting viseme alignment:', error);
     throw error;
@@ -53,8 +58,12 @@ export async function getVisemeAlignment(text: string, voiceId: string): Promise
 // Get available voices for alignment
 export async function getAvailableVoices(): Promise<ElevenLabsVoice[]> {
   try {
-    const response = await apiRequest<{ voices: ElevenLabsVoice[] }>('/api/elevenlabs/voices');
-    return response.voices;
+    const response = await fetch('/api/elevenlabs/voices');
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const data: { voices: ElevenLabsVoice[] } = await response.json();
+    return data.voices;
   } catch (error) {
     console.error('Error getting available voices:', error);
     return [];

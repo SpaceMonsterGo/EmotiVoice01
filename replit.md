@@ -140,6 +140,11 @@ Changelog:
   - Cleaned up status indicators to reduce visual noise during conversations
   - Removed microphone button pulsing animation for cleaner interaction
   - Eliminated green ring around Rive character animation
+  - Removed yellow emotional state indicator dot from character display
+  - Removed duplicate connection status indicator from voice controls
+  - Removed non-functional settings gear icon from header
+  - Changed app title to "Emoti Voice Beta"
+  - Fixed ElevenLabs forced alignment fetch error using standard fetch API
 
 ## User Preferences
 

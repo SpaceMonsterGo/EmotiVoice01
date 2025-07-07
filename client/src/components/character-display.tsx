@@ -173,13 +173,7 @@ export function CharacterDisplay({
       
 
       
-      {/* Emotional State Indicator */}
-      <div className={`absolute top-4 right-4 w-4 h-4 rounded-full animate-bounce-gentle ${
-        emotionalState === 'happy' ? 'bg-green-500' :
-        emotionalState === 'sad' ? 'bg-blue-500' :
-        emotionalState === 'excited' ? 'bg-yellow-500' :
-        'bg-amber-500'
-      }`}></div>
+
       
       {/* Speaking Status */}
       <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex items-center space-x-2 bg-muted/80 backdrop-blur-sm px-4 py-2 rounded-full">

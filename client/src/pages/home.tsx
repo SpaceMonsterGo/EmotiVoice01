@@ -2,7 +2,7 @@ import { useCallback } from "react";
 import { CharacterDisplay } from "@/components/character-display";
 import { useElevenLabsSimple } from "@/hooks/use-elevenlabs-simple";
 import { Button } from "@/components/ui/button";
-import { Settings, Mic, MicOff } from "lucide-react";
+import { Mic, MicOff } from "lucide-react";
 
 export default function Home() {
   // ElevenLabs Simple Conversational AI
@@ -39,7 +39,7 @@ export default function Home() {
             <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg flex items-center justify-center">
               <Mic className="w-4 h-4 text-white" />
             </div>
-            <h1 className="text-xl font-bold">Voice Agent</h1>
+            <h1 className="text-xl font-bold">Emoti Voice Beta</h1>
           </div>
           
           <div className="flex items-center space-x-4">
@@ -49,9 +49,7 @@ export default function Home() {
                 {isConnected ? 'Connected' : 'Disconnected'}
               </span>
             </div>
-            <Button variant="ghost" size="icon">
-              <Settings className="w-4 h-4" />
-            </Button>
+
           </div>
         </div>
       </header>
@@ -101,13 +99,7 @@ export default function Home() {
                 </div>
               </div>
               
-              {/* Connection Status */}
-              <div className="mt-6 flex items-center justify-center space-x-2">
-                <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`} />
-                <span className="text-xs text-gray-400">
-                  {isConnected ? 'Connected to AI' : 'Disconnected'}
-                </span>
-              </div>
+
             </div>
           </div>
         </div>
