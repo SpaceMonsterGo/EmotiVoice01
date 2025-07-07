@@ -110,6 +110,12 @@ Changelog:
   - Created PhonemeConverter for word-to-viseme mapping without Docker dependency
   - Simplified UI to single large microphone button for voice-only interaction
   - ElevenLabs agent auto-introduces itself when conversation starts
+- July 07, 2025: Fixed ElevenLabs Conversational AI implementation:
+  - Replaced incorrect recording system with proper real-time WebSocket streaming
+  - Implemented proper message protocol for conversation_initiation_client_data
+  - Added real-time PCM audio streaming to ElevenLabs Conversational AI
+  - Fixed authentication by removing API key exposure on client side
+  - Character now animates with proper real-time audio stream integration
 
 ## User Preferences
 

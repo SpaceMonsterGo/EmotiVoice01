@@ -76,7 +76,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       res.json({ 
         signedUrl,
-        apiKey,
         agentId 
       });
     } catch (error) {
@@ -85,66 +84,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Voice processing endpoint
+  // Legacy voice processing endpoint - deprecated for Conversational AI
   app.post('/api/voice/process', upload.single('audio'), async (req, res) => {
-    try {
-      const apiKey = process.env.ELEVENLABS_API_KEY;
-      if (!apiKey) {
-        return res.status(500).json({ error: 'ElevenLabs API key not configured' });
-      }
-
-      // Extract audio from form data
-      const audioFile = req.file;
-      if (!audioFile) {
-        return res.status(400).json({ error: 'No audio file provided' });
-      }
-
-      console.log('Received audio file:', audioFile.originalname, 'Size:', audioFile.size);
-
-      // Convert audio to transcription using ElevenLabs or OpenAI Whisper
-      let transcription = "Hello! Thanks for speaking to me."; // Placeholder for now
-      
-      // Generate AI response (you can integrate with your preferred AI service here)
-      const aiResponse = `Hello! I'm responding using ElevenLabs voice synthesis with your actual API key. I received your ${Math.round(audioFile.size / 1024)}KB audio recording. This voice should sound much more natural than the browser's built-in speech synthesis.`;
-      
-      // Use ElevenLabs TTS with your API key
-      console.log('Generating speech with ElevenLabs...');
-      const ttsResponse = await generateSpeechWithTimestamps(aiResponse, {
-        voice_id: 'pNInz6obpgDQGcFmaJgB', // You can change this to your preferred voice
-        voice_settings: {
-          stability: 0.5,
-          similarity_boost: 0.75,
-          style: 0.0,
-          use_speaker_boost: true
-        }
-      });
-      console.log('ElevenLabs TTS response received, audio size:', ttsResponse.audio.length);
-      
-      // Convert timestamps to visemes
-      const visemes = PhonemeConverter.convertWordsToVisemes(
-        ttsResponse.timestamps.map(t => ({
-          word: t.word || t.char,
-          start: t.start,
-          end: t.end
-        }))
-      );
-      
-      // Create audio data URL with proper ElevenLabs audio
-      const audioBuffer = ttsResponse.audio;
-      const audioBase64 = audioBuffer.toString('base64');
-      const audioDataUrl = `data:audio/mpeg;base64,${audioBase64}`;
-      
-      res.json({
-        transcription,
-        message: aiResponse,
-        audioUrl: audioDataUrl,
-        visemes: visemes,
-        timestamps: ttsResponse.timestamps
-      });
-    } catch (error) {
-      console.error('Voice processing error:', error);
-      res.status(500).json({ error: 'Failed to process voice: ' + error.message });
-    }
+    res.status(410).json({ 
+      error: 'This endpoint is deprecated. Use ElevenLabs Conversational AI WebSocket instead.' 
+    });
   });
 
   // ElevenLabs speech with timestamps endpoint  

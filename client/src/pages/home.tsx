@@ -1,23 +1,21 @@
 import { useCallback } from "react";
 import { CharacterDisplay } from "@/components/character-display";
-import { useSimpleVoiceAgent } from "@/hooks/use-simple-voice-agent";
+import { useElevenLabsConversationalAI } from "@/hooks/use-elevenlabs-conversational-ai";
 import { Button } from "@/components/ui/button";
 import { Settings, Mic, MicOff } from "lucide-react";
 
 export default function Home() {
-  // Audio-only ElevenLabs Conversational AI
+  // ElevenLabs Conversational AI
   const {
     isConnected,
-    isRecording,
+    isListening,
     isSpeaking,
     isProcessing,
     error,
-    voiceActivity,
-    startRecording,
-    stopRecording,
+    toggleListening,
     setVisemeCallback,
     clearError
-  } = useSimpleVoiceAgent();
+  } = useElevenLabsConversationalAI();
 
   // Handle viseme callback from character display
   const handleVisemeCallbackReady = useCallback((callback: (viseme: number) => void) => {
@@ -26,12 +24,8 @@ export default function Home() {
 
   // Handle microphone toggle
   const handleMicrophoneToggle = useCallback(() => {
-    if (isRecording) {
-      stopRecording();
-    } else {
-      startRecording();
-    }
-  }, [isRecording, startRecording, stopRecording]);
+    toggleListening();
+  }, [toggleListening]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 text-white">
@@ -66,8 +60,8 @@ export default function Home() {
             <div className="bg-black/20 backdrop-blur-sm rounded-2xl border border-white/10 p-6">
               <CharacterDisplay
                 isSpeaking={isSpeaking}
-                isListening={isRecording}
-                voiceActivity={voiceActivity}
+                isListening={isListening}
+                voiceActivity={isListening ? 50 : 0}
                 emotionalState="neutral"
                 onVisemeCallbackReady={handleVisemeCallbackReady}
               />
@@ -85,12 +79,12 @@ export default function Home() {
                   onClick={handleMicrophoneToggle}
                   disabled={isProcessing}
                   className={`w-20 h-20 rounded-full transition-all duration-300 ${
-                    isRecording 
+                    isListening 
                       ? 'bg-red-500 hover:bg-red-600 animate-pulse' 
                       : 'bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600'
                   }`}
                 >
-                  {isRecording ? (
+                  {isListening ? (
                     <MicOff className="w-8 h-8" />
                   ) : (
                     <Mic className="w-8 h-8" />
@@ -99,18 +93,18 @@ export default function Home() {
                 
                 <div className="text-center">
                   <p className="text-sm text-gray-300">
-                    {isProcessing ? 'Processing with ElevenLabs...' :
-                     isRecording ? 'Recording voice... Click to stop' :
-                     isSpeaking ? 'ElevenLabs AI speaking...' :
-                     'Click to talk with AI'}
+                    {isProcessing ? 'Connecting to ElevenLabs...' :
+                     isListening ? 'Listening... Click to stop' :
+                     isSpeaking ? 'AI is speaking...' :
+                     'Click to start conversation'}
                   </p>
                   
                   {/* Voice Activity Indicator */}
-                  {isRecording && (
+                  {isListening && (
                     <div className="mt-2 w-32 h-2 bg-gray-700 rounded-full overflow-hidden">
                       <div 
-                        className="h-full bg-gradient-to-r from-green-400 to-blue-500 transition-all duration-100"
-                        style={{ width: `${voiceActivity * 100}%` }}
+                        className="h-full bg-gradient-to-r from-green-400 to-blue-500 transition-all duration-100 animate-pulse"
+                        style={{ width: `${50}%` }}
                       />
                     </div>
                   )}
