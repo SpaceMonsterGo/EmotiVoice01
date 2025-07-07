@@ -87,7 +87,7 @@ export function useGeminiVoiceAgent() {
       setMessages(prev => [...prev, { sender: 'user', content: userMessage }]);
       
       // Send to conversation API
-      const response = await apiRequest<ConversationResponse>('/api/conversation/message', {
+      const response = await fetch('/api/conversation/message', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -96,11 +96,17 @@ export function useGeminiVoiceAgent() {
         })
       });
       
+      if (!response.ok) {
+        throw new Error(`API request failed: ${response.status}`);
+      }
+      
+      const responseData: ConversationResponse = await response.json();
+      
       // Add AI response to conversation
-      setMessages(prev => [...prev, { sender: 'ai', content: response.response }]);
+      setMessages(prev => [...prev, { sender: 'ai', content: responseData.response }]);
       
       // Play audio with synchronized visemes
-      await playAudioWithVisemes(response.audio, response.visemes);
+      await playAudioWithVisemes(responseData.audio, responseData.visemes);
       
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to process audio');
@@ -175,7 +181,7 @@ export function useGeminiVoiceAgent() {
       setMessages(prev => [...prev, { sender: 'user', content: message }]);
       
       // Send to conversation API
-      const response = await apiRequest<ConversationResponse>('/api/conversation/message', {
+      const response = await fetch('/api/conversation/message', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -184,11 +190,17 @@ export function useGeminiVoiceAgent() {
         })
       });
       
+      if (!response.ok) {
+        throw new Error(`API request failed: ${response.status}`);
+      }
+      
+      const responseData: ConversationResponse = await response.json();
+      
       // Add AI response to conversation
-      setMessages(prev => [...prev, { sender: 'ai', content: response.response }]);
+      setMessages(prev => [...prev, { sender: 'ai', content: responseData.response }]);
       
       // Play audio with synchronized visemes
-      await playAudioWithVisemes(response.audio, response.visemes);
+      await playAudioWithVisemes(responseData.audio, responseData.visemes);
       
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to send message');

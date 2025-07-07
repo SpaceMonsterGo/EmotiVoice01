@@ -247,7 +247,7 @@ export default function Home() {
             <Button 
               variant="ghost" 
               size="icon" 
-              onClick={clearError}
+              onClick={useGeminiMode ? geminiClearError : legacyClearError}
               className="text-destructive-foreground/80 hover:text-destructive-foreground"
             >
               <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
