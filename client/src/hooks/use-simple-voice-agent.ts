@@ -177,7 +177,10 @@ export function useSimpleVoiceAgent() {
       
       // Play response audio and animate visemes
       if (result.audioUrl) {
+        console.log('Playing ElevenLabs audio response');
         await playResponseAudio(result.audioUrl, result.visemes || []);
+      } else {
+        console.log('No audio URL in response:', result);
       }
       
     } catch (error) {

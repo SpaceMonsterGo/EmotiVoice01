@@ -99,10 +99,10 @@ export default function Home() {
                 
                 <div className="text-center">
                   <p className="text-sm text-gray-300">
-                    {isProcessing ? 'Processing...' :
-                     isRecording ? 'Listening... Click to stop' :
-                     isSpeaking ? 'AI is speaking...' :
-                     'Click to start conversation'}
+                    {isProcessing ? 'Processing with ElevenLabs...' :
+                     isRecording ? 'Recording voice... Click to stop' :
+                     isSpeaking ? 'ElevenLabs AI speaking...' :
+                     'Click to talk with AI'}
                   </p>
                   
                   {/* Voice Activity Indicator */}

@@ -8,9 +8,16 @@ import { generateSpeechWithTimestamps } from "./elevenlabs-tts.js";
 import { PhonemeConverter } from "./phoneme-converter.js";
 import path from "path";
 import fs from "fs";
+import multer from "multer";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   const httpServer = createServer(app);
+  
+  // Setup multer for file uploads
+  const upload = multer({ 
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
+  });
   
   // WebSocket server for real-time voice communication
   const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
@@ -79,14 +86,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Voice processing endpoint
-  app.post('/api/voice/process', async (req, res) => {
+  app.post('/api/voice/process', upload.single('audio'), async (req, res) => {
     try {
-      // For testing, create a simple response with TTS
-      const testResponse = "Thank you for speaking! I'm working on processing your voice input. This is a test response to demonstrate the system is working.";
+      const apiKey = process.env.ELEVENLABS_API_KEY;
+      if (!apiKey) {
+        return res.status(500).json({ error: 'ElevenLabs API key not configured' });
+      }
+
+      // Extract audio from form data
+      const audioFile = req.file;
+      if (!audioFile) {
+        return res.status(400).json({ error: 'No audio file provided' });
+      }
+
+      console.log('Received audio file:', audioFile.originalname, 'Size:', audioFile.size);
+
+      // Convert audio to transcription using ElevenLabs or OpenAI Whisper
+      let transcription = "Hello! Thanks for speaking to me."; // Placeholder for now
       
-      const ttsResponse = await generateSpeechWithTimestamps(testResponse, {
-        voice_id: 'pNInz6obpgDQGcFmaJgB' // Default ElevenLabs voice
+      // Generate AI response (you can integrate with your preferred AI service here)
+      const aiResponse = `Hello! I'm responding using ElevenLabs voice synthesis with your actual API key. I received your ${Math.round(audioFile.size / 1024)}KB audio recording. This voice should sound much more natural than the browser's built-in speech synthesis.`;
+      
+      // Use ElevenLabs TTS with your API key
+      console.log('Generating speech with ElevenLabs...');
+      const ttsResponse = await generateSpeechWithTimestamps(aiResponse, {
+        voice_id: 'pNInz6obpgDQGcFmaJgB', // You can change this to your preferred voice
+        voice_settings: {
+          stability: 0.5,
+          similarity_boost: 0.75,
+          style: 0.0,
+          use_speaker_boost: true
+        }
       });
+      console.log('ElevenLabs TTS response received, audio size:', ttsResponse.audio.length);
       
       // Convert timestamps to visemes
       const visemes = PhonemeConverter.convertWordsToVisemes(
@@ -97,20 +129,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }))
       );
       
-      // Create temporary audio file
+      // Create audio data URL with proper ElevenLabs audio
       const audioBuffer = ttsResponse.audio;
       const audioBase64 = audioBuffer.toString('base64');
       const audioDataUrl = `data:audio/mpeg;base64,${audioBase64}`;
       
       res.json({
-        message: testResponse,
+        transcription,
+        message: aiResponse,
         audioUrl: audioDataUrl,
         visemes: visemes,
         timestamps: ttsResponse.timestamps
       });
     } catch (error) {
       console.error('Voice processing error:', error);
-      res.status(500).json({ error: 'Failed to process voice' });
+      res.status(500).json({ error: 'Failed to process voice: ' + error.message });
     }
   });
 
