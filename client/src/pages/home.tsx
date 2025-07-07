@@ -47,6 +47,11 @@ export default function Home() {
   // Use ElevenLabs states where available
   const isConnected = elevenLabsConnected;
   const isSpeaking = elevenLabsSpeaking;
+  
+  // Debug speaking state
+  useEffect(() => {
+    console.log('Speaking state changed:', isSpeaking);
+  }, [isSpeaking]);
 
   // Handle viseme callback from character display
   const handleVisemeCallbackReady = useCallback((callback: (viseme: number) => void) => {
@@ -54,59 +59,49 @@ export default function Home() {
     console.log('Viseme callback ready');
   }, []);
 
-  // Test viseme animation with fake sequence
+  // Manual test function for visemes
+  const testVisemeSequence = useCallback(() => {
+    if (!visemeCallback) {
+      console.log('No viseme callback available');
+      return;
+    }
+    
+    // Create a test sequence that cycles through all visemes
+    const testSequence = [
+      { viseme: 1, delay: 0 },     // A
+      { viseme: 2, delay: 300 },   // E
+      { viseme: 3, delay: 600 },   // I
+      { viseme: 4, delay: 900 },   // O
+      { viseme: 5, delay: 1200 },  // U
+      { viseme: 6, delay: 1500 },  // M/B/P
+      { viseme: 7, delay: 1800 },  // F/V
+      { viseme: 8, delay: 2100 },  // TH
+      { viseme: 9, delay: 2400 },  // T/D/S/Z
+      { viseme: 0, delay: 2700 },  // Closed
+    ];
+    
+    console.log('Starting manual test viseme sequence...');
+    
+    testSequence.forEach(({ viseme, delay }) => {
+      setTimeout(() => {
+        visemeCallback(viseme);
+        console.log(`Manual test viseme: ${viseme}`);
+      }, delay);
+    });
+  }, [visemeCallback]);
+
+  // Test viseme animation based on speaking state
   useEffect(() => {
     if (!visemeCallback) return;
     
-    let timeouts: NodeJS.Timeout[] = [];
-    
     if (isSpeaking) {
-      // Create a test sequence that cycles through all visemes
-      const testSequence = [
-        { viseme: 1, delay: 0 },     // A
-        { viseme: 2, delay: 200 },   // E
-        { viseme: 3, delay: 400 },   // I
-        { viseme: 4, delay: 600 },   // O
-        { viseme: 5, delay: 800 },   // U
-        { viseme: 6, delay: 1000 },  // M/B/P
-        { viseme: 7, delay: 1200 },  // F/V
-        { viseme: 8, delay: 1400 },  // TH
-        { viseme: 9, delay: 1600 },  // T/D/S/Z
-        { viseme: 0, delay: 1800 },  // Closed
-      ];
-      
-      console.log('Starting test viseme sequence...');
-      
-      testSequence.forEach(({ viseme, delay }) => {
-        const timeout = setTimeout(() => {
-          visemeCallback(viseme);
-          console.log(`Test viseme: ${viseme}`);
-        }, delay);
-        timeouts.push(timeout);
-      });
-      
-      // Repeat the sequence every 2 seconds while speaking
-      const repeatInterval = setInterval(() => {
-        testSequence.forEach(({ viseme, delay }) => {
-          const timeout = setTimeout(() => {
-            visemeCallback(viseme);
-            console.log(`Test viseme: ${viseme}`);
-          }, delay);
-          timeouts.push(timeout);
-        });
-      }, 2000);
-      
-      timeouts.push(repeatInterval as any);
-      
+      console.log('AI is speaking, starting viseme test...');
+      testVisemeSequence();
     } else {
       // Not speaking - closed mouth
       visemeCallback(0);
     }
-    
-    return () => {
-      timeouts.forEach(timeout => clearTimeout(timeout));
-    };
-  }, [isSpeaking, visemeCallback]);
+  }, [isSpeaking, visemeCallback, testVisemeSequence]);
 
   return (
     <div className="flex flex-col h-screen bg-background text-foreground overflow-hidden">
@@ -130,6 +125,14 @@ export default function Home() {
               {isConnected ? 'Connected' : 'Disconnected'}
             </span>
           </div>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={testVisemeSequence}
+            className="rounded-full text-xs"
+          >
+            Test Lips
+          </Button>
           <Button variant="ghost" size="icon" className="rounded-full">
             <Settings className="h-4 w-4" />
           </Button>
