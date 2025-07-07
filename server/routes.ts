@@ -4,6 +4,9 @@ import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
 import { insertMessageSchema } from "@shared/schema";
 import { z } from "zod";
+import { generateConversationResponse } from "./gemini.js";
+import { generateSpeechWithTimestamps } from "./elevenlabs-tts.js";
+import { convertTimestampsToVisemes } from "./viseme-converter.js";
 import path from "path";
 import fs from "fs";
 
@@ -205,6 +208,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error creating message:', error);
       res.status(500).json({ error: 'Failed to create message' });
+    }
+  });
+
+  // New conversation API with Gemini + ElevenLabs TTS
+  app.post('/api/conversation/message', async (req, res) => {
+    try {
+      const { message: userMessage, conversationId } = req.body;
+      
+      if (!userMessage || typeof userMessage !== 'string') {
+        return res.status(400).json({ error: 'Message is required' });
+      }
+
+      // Get conversation history for context
+      const conversation = await storage.getConversation(conversationId);
+      const messages = conversationId ? await storage.getMessagesByConversationId(conversationId) : [];
+      
+      // Generate conversation history for context
+      const conversationHistory = messages.slice(-10).map(msg => 
+        `${msg.sender === 'user' ? 'Human' : 'Emoti'}: ${msg.content}`
+      );
+
+      // Generate response using Gemini
+      const aiResponse = await generateConversationResponse(userMessage, conversationHistory);
+      
+      // Generate speech with timestamps using ElevenLabs
+      const speechData = await generateSpeechWithTimestamps(aiResponse);
+      
+      // Convert timestamps to visemes
+      const visemes = convertTimestampsToVisemes(speechData.timestamps);
+      
+      // Store both messages in conversation
+      if (conversationId) {
+        await storage.createMessage({
+          conversationId,
+          sender: 'user',
+          content: userMessage,
+          timestamp: new Date()
+        });
+        
+        await storage.createMessage({
+          conversationId,
+          sender: 'ai',
+          content: aiResponse,
+          timestamp: new Date()
+        });
+      }
+      
+      // Return response with audio and viseme data
+      res.json({
+        response: aiResponse,
+        audio: speechData.audio.toString('base64'),
+        visemes: visemes,
+        timestamps: speechData.timestamps
+      });
+      
+    } catch (error) {
+      console.error('Error in conversation:', error);
+      res.status(500).json({ error: 'Failed to process conversation' });
     }
   });
 

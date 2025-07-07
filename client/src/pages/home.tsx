@@ -3,13 +3,15 @@ import { CharacterDisplay } from "@/components/character-display";
 import { VoiceControls } from "@/components/voice-controls";
 import { ConversationHistory } from "@/components/conversation-history";
 import { useVoiceAgent } from "@/hooks/use-voice-agent";
+import { useGeminiVoiceAgent } from "@/hooks/use-gemini-voice-agent";
 import { useElevenLabsAgent } from "@/lib/elevenlabs";
 import { Button } from "@/components/ui/button";
-import { Settings, Wifi } from "lucide-react";
+import { Settings, Wifi, Zap, Bot } from "lucide-react";
 import { testRiveFile } from "@/test-rive";
 
 export default function Home() {
   const [visemeCallback, setVisemeCallback] = useState<((viseme: number) => void) | null>(null);
+  const [useGeminiMode, setUseGeminiMode] = useState(false);
   
   // ElevenLabs agent with timestamp-based viseme callbacks
   const {
@@ -29,24 +31,42 @@ export default function Home() {
     }
   });
 
+  // Gemini + ElevenLabs TTS agent
+  const {
+    isRecording: geminiIsRecording,
+    isProcessing: geminiIsProcessing,
+    isSpeaking: geminiIsSpeaking,
+    error: geminiError,
+    messages: geminiMessages,
+    startRecording: geminiStartRecording,
+    stopRecording: geminiStopRecording,
+    sendTextMessage: geminiSendTextMessage,
+    clearError: geminiClearError,
+    setVisemeCallback: geminiSetVisemeCallback
+  } = useGeminiVoiceAgent();
+
   // Voice agent state (for UI management)
   const {
-    isRecording,
-    isProcessing,
-    messages,
-    error,
-    startRecording,
-    stopRecording,
+    isRecording: legacyIsRecording,
+    isProcessing: legacyIsProcessing,
+    messages: legacyMessages,
+    error: legacyError,
+    startRecording: legacyStartRecording,
+    stopRecording: legacyStopRecording,
     toggleMute,
     isMuted,
     voiceActivity,
     agentStatus,
-    clearError
+    clearError: legacyClearError
   } = useVoiceAgent();
 
-  // Use ElevenLabs states where available
-  const isConnected = elevenLabsConnected;
-  const isSpeaking = elevenLabsSpeaking;
+  // Use current mode states
+  const isConnected = useGeminiMode ? true : elevenLabsConnected;
+  const isSpeaking = useGeminiMode ? geminiIsSpeaking : elevenLabsSpeaking;
+  const isRecording = useGeminiMode ? geminiIsRecording : legacyIsRecording;
+  const isProcessing = useGeminiMode ? geminiIsProcessing : legacyIsProcessing;
+  const messages = useGeminiMode ? geminiMessages : legacyMessages;
+  const error = useGeminiMode ? geminiError : legacyError;
   
   // Debug speaking state
   useEffect(() => {
@@ -56,8 +76,10 @@ export default function Home() {
   // Handle viseme callback from character display
   const handleVisemeCallbackReady = useCallback((callback: (viseme: number) => void) => {
     setVisemeCallback(() => callback);
+    // Also set callback for Gemini agent
+    geminiSetVisemeCallback(callback);
     console.log('Viseme callback ready');
-  }, []);
+  }, [geminiSetVisemeCallback]);
 
   // Manual test function for visemes
   const testVisemeSequence = useCallback(() => {
@@ -128,6 +150,15 @@ export default function Home() {
           <Button 
             variant="ghost" 
             size="sm" 
+            onClick={() => setUseGeminiMode(!useGeminiMode)}
+            className="rounded-full text-xs flex items-center gap-1"
+          >
+            {useGeminiMode ? <Zap className="h-3 w-3" /> : <Bot className="h-3 w-3" />}
+            {useGeminiMode ? 'Gemini' : 'ElevenLabs'}
+          </Button>
+          <Button 
+            variant="ghost" 
+            size="sm" 
             onClick={testVisemeSequence}
             className="rounded-full text-xs"
           >
@@ -157,6 +188,21 @@ export default function Home() {
         <div className="max-h-40 overflow-y-auto px-4 pb-4">
           <ConversationHistory messages={messages} />
         </div>
+        
+        {/* Test button for Gemini mode */}
+        {useGeminiMode && (
+          <div className="px-4 pb-4">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => geminiSendTextMessage("Hello, how are you feeling today?")}
+              disabled={isProcessing}
+              className="w-full"
+            >
+              {isProcessing ? 'Processing...' : 'Test Gemini Conversation'}
+            </Button>
+          </div>
+        )}
       </main>
 
       {/* Voice Controls */}
@@ -166,8 +212,8 @@ export default function Home() {
           isProcessing={isProcessing}
           isMuted={isMuted}
           voiceActivity={voiceActivity}
-          onStartRecording={startRecording}
-          onStopRecording={stopRecording}
+          onStartRecording={useGeminiMode ? geminiStartRecording : legacyStartRecording}
+          onStopRecording={useGeminiMode ? geminiStopRecording : legacyStopRecording}
           onToggleMute={toggleMute}
         />
       </footer>
