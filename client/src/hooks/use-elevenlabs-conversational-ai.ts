@@ -162,16 +162,18 @@ export function useElevenLabsConversationalAI() {
         break;
 
       case 'audio_end':
-        console.log('Audio playback ending');
+        console.log('AI finished speaking, ready for user input');
         setState(prev => ({ ...prev, isSpeaking: false }));
         if (visemeCallbackRef.current) {
           visemeCallbackRef.current(0);
         }
+        // Keep conversation active for continued dialogue
         break;
 
       case 'user_transcript':
         const transcript = data.user_transcription_event;
-        console.log('User transcript:', transcript.user_transcript);
+        console.log('User said:', transcript.user_transcript);
+        // User speech detected - keep conversation flowing
         break;
 
       case 'agent_response':
@@ -241,6 +243,7 @@ export function useElevenLabsConversationalAI() {
       setTimeout(() => {
         if (websocketRef.current?.readyState === WebSocket.OPEN) {
           startAudioProcessing();
+          console.log('Audio processing started - conversation ready');
         }
       }, 1000);
 
@@ -394,11 +397,12 @@ export function useElevenLabsConversationalAI() {
         if (audioQueueRef.current.length > 0) {
           setTimeout(() => processAudioQueue(), 50);
         } else {
-          // All chunks finished
+          // All chunks finished - keep conversation active for continued dialogue
           setState(prev => ({ ...prev, isSpeaking: false }));
           if (visemeCallbackRef.current) {
             visemeCallbackRef.current(0);
           }
+          console.log('AI finished speaking, conversation continues...');
         }
       };
 
