@@ -29,9 +29,16 @@ export function useElevenLabsConversationalAI() {
   const visemeCallbackRef = useRef<((viseme: number) => void) | null>(null);
   const audioQueueRef = useRef<string[]>([]);
   const isPlayingRef = useRef(false);
+  const isConnectingRef = useRef(false);
 
   // Connect to ElevenLabs Conversational AI
   const connect = useCallback(async () => {
+    // Prevent multiple simultaneous connections
+    if (isConnectingRef.current || websocketRef.current?.readyState === WebSocket.OPEN) {
+      console.log('Already connecting or connected, skipping...');
+      return;
+    }
+
     // Close any existing connection first
     if (websocketRef.current) {
       websocketRef.current.close();
@@ -39,6 +46,7 @@ export function useElevenLabsConversationalAI() {
     }
 
     try {
+      isConnectingRef.current = true;
       setState(prev => ({ ...prev, isProcessing: true, error: null }));
 
       // Get signed URL from server
@@ -54,6 +62,7 @@ export function useElevenLabsConversationalAI() {
 
       ws.onopen = () => {
         console.log('Connected to ElevenLabs Conversational AI');
+        isConnectingRef.current = false;
         setState(prev => ({ ...prev, isConnected: true, isProcessing: false }));
         
         // Send conversation initiation - use agent's default config
@@ -75,6 +84,7 @@ export function useElevenLabsConversationalAI() {
 
       ws.onerror = (error) => {
         console.error('WebSocket error:', error);
+        isConnectingRef.current = false;
         setState(prev => ({ 
           ...prev, 
           error: 'Connection failed', 
@@ -92,11 +102,14 @@ export function useElevenLabsConversationalAI() {
           isSpeaking: false
         }));
         
+        // Reset connection state on close
+        isConnectingRef.current = false;
+        
         // Don't auto-reconnect for manual disconnects or normal closes
         if (event.code !== 1000 && event.code !== 1005 && event.code !== 1008) {
           console.log('Unexpected close, attempting to reconnect...');
           setTimeout(() => {
-            if (state.isListening) {
+            if (state.isListening && !isConnectingRef.current) {
               connect();
             }
           }, 2000);
@@ -110,6 +123,7 @@ export function useElevenLabsConversationalAI() {
 
     } catch (error) {
       console.error('Failed to connect:', error);
+      isConnectingRef.current = false;
       setState(prev => ({ 
         ...prev, 
         error: 'Failed to connect',
@@ -200,7 +214,7 @@ export function useElevenLabsConversationalAI() {
   // Start listening (microphone input)
   const startListening = useCallback(async () => {
     // Prevent multiple simultaneous connections
-    if (state.isProcessing || state.isConnected) {
+    if (isConnectingRef.current || state.isProcessing || state.isConnected) {
       console.log('Already connecting or connected, ignoring duplicate request');
       return;
     }
@@ -235,6 +249,7 @@ export function useElevenLabsConversationalAI() {
 
     } catch (error) {
       console.error('Failed to start listening:', error);
+      isConnectingRef.current = false;
       setState(prev => ({ 
         ...prev, 
         error: 'Failed to access microphone',
