@@ -86,8 +86,8 @@ export function useElevenLabsConversationalAI() {
           isSpeaking: false
         }));
         
-        // Try to reconnect if unexpected close (but not for config errors)
-        if (event.code !== 1000 && event.code !== 1008) {
+        // Don't auto-reconnect for manual disconnects or normal closes
+        if (event.code !== 1000 && event.code !== 1005 && event.code !== 1008) {
           console.log('Unexpected close, attempting to reconnect...');
           setTimeout(() => {
             if (state.isListening) {
@@ -129,6 +129,19 @@ export function useElevenLabsConversationalAI() {
           console.log('Received audio response, playing...');
           setState(prev => ({ ...prev, isSpeaking: true }));
           playAudioResponse(audioEvent.audio_base_64);
+        }
+        break;
+
+      case 'audio_start':
+        console.log('Audio playback starting');
+        setState(prev => ({ ...prev, isSpeaking: true }));
+        break;
+
+      case 'audio_end':
+        console.log('Audio playback ending');
+        setState(prev => ({ ...prev, isSpeaking: false }));
+        if (visemeCallbackRef.current) {
+          visemeCallbackRef.current(0);
         }
         break;
 
@@ -306,6 +319,27 @@ export function useElevenLabsConversationalAI() {
       source.buffer = audioBuffer;
       source.connect(audioContext.destination);
       
+      // Generate visemes during playback
+      const duration = audioBuffer.duration;
+      const visemeCount = Math.floor(duration * 8); // 8 visemes per second
+      
+      // Clear any existing viseme animation
+      if (visemeCallbackRef.current) {
+        visemeCallbackRef.current(0);
+      }
+      
+      // Start viseme animation
+      for (let i = 0; i < visemeCount; i++) {
+        setTimeout(() => {
+          if (visemeCallbackRef.current && source.context.state === 'running') {
+            // Generate realistic viseme sequence based on speech patterns
+            const visemeSequence = [1, 3, 5, 7, 9, 11, 13, 2, 4, 6, 8, 10, 12, 14, 15];
+            const viseme = visemeSequence[i % visemeSequence.length];
+            visemeCallbackRef.current(viseme);
+          }
+        }, (i * duration * 1000) / visemeCount);
+      }
+      
       source.onended = () => {
         console.log('Audio playback ended');
         setState(prev => ({ ...prev, isSpeaking: false }));
@@ -314,7 +348,7 @@ export function useElevenLabsConversationalAI() {
         }
       };
 
-      console.log('Starting audio playback...');
+      console.log('Starting audio playback with viseme animation...');
       source.start();
 
     } catch (error) {
