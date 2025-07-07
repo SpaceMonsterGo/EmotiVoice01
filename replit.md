@@ -120,6 +120,13 @@ Changelog:
   - Added synchronized viseme generation for natural lip-sync animation
   - Implemented ping/pong heartbeat and emotion detection handling
   - Prevented duplicate connections and improved connection management
+- July 07, 2025: Simplified to use ElevenLabs built-in conversation management:
+  - Created new useElevenLabsSimple hook following official documentation
+  - Removed overengineered conversation state management
+  - ElevenLabs handles all conversation flow automatically
+  - Uses proper ping/pong responses to maintain connection
+  - Simplified audio streaming using 250ms MediaRecorder chunks
+  - Conversation continues seamlessly after initial AI greeting
 
 ## User Preferences
 

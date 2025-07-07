@@ -1,22 +1,20 @@
 import { useCallback } from "react";
 import { CharacterDisplay } from "@/components/character-display";
-import { useElevenLabsConversationalAI } from "@/hooks/use-elevenlabs-conversational-ai";
+import { useElevenLabsSimple } from "@/hooks/use-elevenlabs-simple";
 import { Button } from "@/components/ui/button";
 import { Settings, Mic, MicOff } from "lucide-react";
 
 export default function Home() {
-  // ElevenLabs Conversational AI
+  // ElevenLabs Simple Conversational AI
   const {
     isConnected,
     isListening,
     isSpeaking,
-    isProcessing,
     error,
-    voiceActivity,
-    toggleListening,
+    startConversation,
+    stopConversation,
     setVisemeCallback,
-    clearError
-  } = useElevenLabsConversationalAI();
+  } = useElevenLabsSimple();
 
   // Handle viseme callback from character display
   const handleVisemeCallbackReady = useCallback((callback: (viseme: number) => void) => {
@@ -25,8 +23,12 @@ export default function Home() {
 
   // Handle microphone toggle
   const handleMicrophoneToggle = useCallback(() => {
-    toggleListening();
-  }, [toggleListening]);
+    if (isListening) {
+      stopConversation();
+    } else {
+      startConversation();
+    }
+  }, [isListening, startConversation, stopConversation]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 text-white">
@@ -62,7 +64,7 @@ export default function Home() {
               <CharacterDisplay
                 isSpeaking={isSpeaking}
                 isListening={isListening}
-                voiceActivity={voiceActivity}
+                voiceActivity={0}
                 emotionalState="neutral"
                 onVisemeCallbackReady={handleVisemeCallbackReady}
               />
@@ -78,7 +80,7 @@ export default function Home() {
               <div className="flex flex-col items-center space-y-4">
                 <Button
                   onClick={handleMicrophoneToggle}
-                  disabled={isProcessing}
+                  disabled={false}
                   className={`w-20 h-20 rounded-full transition-all duration-300 ${
                     isListening 
                       ? 'bg-red-500 hover:bg-red-600 animate-pulse' 
@@ -94,8 +96,7 @@ export default function Home() {
                 
                 <div className="text-center">
                   <p className="text-sm text-gray-300">
-                    {isProcessing ? 'Connecting to ElevenLabs...' :
-                     isListening ? 'Listening... Click to stop' :
+                    {isListening ? 'Listening... Click to stop' :
                      isSpeaking ? 'AI is speaking...' :
                      'Click to start conversation'}
                   </p>
@@ -105,7 +106,7 @@ export default function Home() {
                     <div className="mt-2 w-32 h-2 bg-gray-700 rounded-full overflow-hidden">
                       <div 
                         className="h-full bg-gradient-to-r from-green-400 to-blue-500 transition-all duration-100 animate-pulse"
-                        style={{ width: `${voiceActivity}%` }}
+                        style={{ width: `${isListening ? 80 : 0}%` }}
                       />
                     </div>
                   )}
