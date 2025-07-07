@@ -28,7 +28,7 @@ export function useElevenLabsSimple() {
     visemeCallbackRef.current = callback;
   }, []);
 
-  // Simple viseme generation during speech
+  // Simple viseme generation for generic audio without text
   const generateVisemes = useCallback((duration: number) => {
     if (!visemeCallbackRef.current) return;
     
@@ -36,7 +36,9 @@ export function useElevenLabsSimple() {
     for (let i = 0; i < visemeCount; i++) {
       setTimeout(() => {
         if (visemeCallbackRef.current) {
-          const viseme = Math.floor(Math.random() * 15) + 1;
+          // Generate semi-realistic viseme sequence
+          const visemeSequence = [1, 3, 5, 7, 9, 11, 13, 15, 2, 4, 6, 8, 10, 12, 14];
+          const viseme = visemeSequence[i % visemeSequence.length];
           visemeCallbackRef.current(viseme);
         }
       }, (i * duration * 1000) / visemeCount);
@@ -48,6 +50,47 @@ export function useElevenLabsSimple() {
         visemeCallbackRef.current(0);
       }
     }, duration * 1000);
+  }, []);
+
+  // Generate visemes based on text content for more realistic lip sync
+  const generateTextBasedVisemes = useCallback((text: string) => {
+    if (!visemeCallbackRef.current || !text) return;
+
+    // Simple text-to-viseme mapping
+    const textToVisemeMap: { [key: string]: number } = {
+      'a': 1, 'e': 2, 'i': 3, 'o': 4, 'u': 5,
+      'b': 6, 'p': 6, 'm': 6,
+      'f': 7, 'v': 7,
+      't': 9, 'd': 9, 'n': 9, 'l': 9,
+      'k': 10, 'g': 10,
+      'ch': 11, 'sh': 11,
+      'r': 12,
+      's': 13, 'z': 13,
+      'th': 8
+    };
+
+    const chars = text.toLowerCase().split('');
+    const charDuration = 150; // ms per character
+    
+    chars.forEach((char, index) => {
+      if (char === ' ') return;
+      
+      const viseme = textToVisemeMap[char] || 1; // Default to 'a' sound
+      const delay = index * charDuration;
+      
+      setTimeout(() => {
+        if (visemeCallbackRef.current) {
+          visemeCallbackRef.current(viseme);
+        }
+      }, delay);
+    });
+
+    // Reset to neutral after text
+    setTimeout(() => {
+      if (visemeCallbackRef.current) {
+        visemeCallbackRef.current(0);
+      }
+    }, chars.length * charDuration);
   }, []);
 
   // Handle WebSocket messages
@@ -129,7 +172,21 @@ export function useElevenLabsSimple() {
           break;
 
         case 'agent_response':
-          console.log('Agent response:', data.agent_response_event?.agent_response);
+          const agentText = data.agent_response_event?.agent_response;
+          console.log('Agent response:', agentText);
+          // Generate visemes based on the text content for more realistic lip sync
+          if (agentText) {
+            generateTextBasedVisemes(agentText);
+          }
+          break;
+
+        case 'interruption':
+          console.log('Audio interruption detected');
+          setState(prev => ({ ...prev, isSpeaking: false }));
+          break;
+
+        case 'agent_response_correction':
+          console.log('Agent response correction:', data.agent_response_correction_event);
           break;
 
         case 'ping':
