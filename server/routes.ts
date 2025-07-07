@@ -61,8 +61,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Generate a signed URL for the ElevenLabs conversational AI
-      const agentId = process.env.ELEVENLABS_AGENT_ID || "default_agent";
-      const signedUrl = `https://api.elevenlabs.io/v1/convai/conversation?agent_id=${agentId}`;
+      const agentId = process.env.ELEVENLABS_AGENT_ID;
+      if (!agentId) {
+        return res.status(500).json({ error: 'ElevenLabs Agent ID not configured' });
+      }
+      const signedUrl = `wss://api.elevenlabs.io/v1/convai/conversation?agent_id=${agentId}`;
       
       res.json({ 
         signedUrl,
@@ -75,7 +78,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // ElevenLabs speech with timestamps endpoint
+  // Voice processing endpoint
+  app.post('/api/voice/process', async (req, res) => {
+    try {
+      // For testing, create a simple response with TTS
+      const testResponse = "Thank you for speaking! I'm working on processing your voice input. This is a test response to demonstrate the system is working.";
+      
+      const ttsResponse = await generateSpeechWithTimestamps(testResponse, {
+        voice_id: 'pNInz6obpgDQGcFmaJgB' // Default ElevenLabs voice
+      });
+      
+      // Convert timestamps to visemes
+      const visemes = PhonemeConverter.convertWordsToVisemes(
+        ttsResponse.timestamps.map(t => ({
+          word: t.word || t.char,
+          start: t.start,
+          end: t.end
+        }))
+      );
+      
+      // Create temporary audio file
+      const audioBuffer = ttsResponse.audio;
+      const audioBase64 = audioBuffer.toString('base64');
+      const audioDataUrl = `data:audio/mpeg;base64,${audioBase64}`;
+      
+      res.json({
+        message: testResponse,
+        audioUrl: audioDataUrl,
+        visemes: visemes,
+        timestamps: ttsResponse.timestamps
+      });
+    } catch (error) {
+      console.error('Voice processing error:', error);
+      res.status(500).json({ error: 'Failed to process voice' });
+    }
+  });
+
+  // ElevenLabs speech with timestamps endpoint  
   app.post('/api/elevenlabs/speech-with-timestamps', async (req, res) => {
     try {
       const { text, apiKey } = req.body;

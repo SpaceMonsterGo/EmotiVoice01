@@ -49,9 +49,11 @@ export function useElevenLabsVoiceAgent() {
       if (!signedUrlResponse.ok) {
         throw new Error('Failed to get signed URL');
       }
-      const { signedUrl } = await signedUrlResponse.json();
+      const { signedUrl, apiKey } = await signedUrlResponse.json();
 
-      const ws = new WebSocket(signedUrl);
+      // Create WebSocket connection with API key in URL
+      const authenticatedUrl = `${signedUrl}&api_key=${apiKey}`;
+      const ws = new WebSocket(authenticatedUrl);
       
       ws.addEventListener('open', () => {
         console.log('Connected to ElevenLabs Conversational AI');
@@ -61,7 +63,7 @@ export function useElevenLabsVoiceAgent() {
           isProcessing: false 
         }));
         
-        // Send conversation initiation only once
+        // Send conversation initiation with proper format
         const initMessage = {
           type: "conversation_initiation_client_data",
           conversation_config_override: {

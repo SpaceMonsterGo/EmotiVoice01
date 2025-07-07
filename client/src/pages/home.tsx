@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 import { CharacterDisplay } from "@/components/character-display";
-import { useElevenLabsVoiceAgent } from "@/hooks/use-elevenlabs-voice-agent";
+import { useSimpleVoiceAgent } from "@/hooks/use-simple-voice-agent";
 import { Button } from "@/components/ui/button";
 import { Settings, Mic, MicOff } from "lucide-react";
 
@@ -17,7 +17,7 @@ export default function Home() {
     stopRecording,
     setVisemeCallback,
     clearError
-  } = useElevenLabsVoiceAgent();
+  } = useSimpleVoiceAgent();
 
   // Handle viseme callback from character display
   const handleVisemeCallbackReady = useCallback((callback: (viseme: number) => void) => {
