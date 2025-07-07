@@ -145,6 +145,12 @@ Changelog:
   - Removed non-functional settings gear icon from header
   - Changed app title to "Emoti Voice Beta"
   - Fixed ElevenLabs forced alignment fetch error using standard fetch API
+- July 07, 2025: Fixed duplicate LLM response issue:
+  - Removed duplicate viseme generation from audio events (was generating visemes twice)
+  - Added connection attempt debouncing to prevent duplicate WebSocket connections
+  - Improved WebSocket error handling and connection state management
+  - Added detailed logging to track message events and prevent duplicate processing
+  - Now only generates visemes from agent_response text events for precise lip sync
 
 ## User Preferences
 

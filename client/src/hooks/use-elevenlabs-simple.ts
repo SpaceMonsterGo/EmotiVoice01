@@ -22,6 +22,7 @@ export function useElevenLabsSimple() {
   const streamRef = useRef<MediaStream | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const visemeCallbackRef = useRef<((viseme: number) => void) | null>(null);
+  const connectionAttemptRef = useRef<boolean>(false);
   
   // Refs for forced alignment data collection
   const currentAudioDataRef = useRef<Uint8Array | null>(null);
@@ -194,10 +195,9 @@ export function useElevenLabsSimple() {
               source.buffer = audioBuffer;
               source.connect(audioContext.destination);
               
-              // Generate visemes during playback
+              // Only play audio - visemes will be generated from agent_response text
               const duration = audioBuffer.duration;
               console.log('Playing audio, duration:', duration);
-              generateVisemes(duration);
               
               source.onended = () => {
                 console.log('Audio playback ended');
@@ -237,7 +237,8 @@ export function useElevenLabsSimple() {
 
         case 'agent_response':
           const agentText = data.agent_response_event?.agent_response;
-          console.log('Agent response:', agentText);
+          const eventId = data.agent_response_event?.event_id;
+          console.log('Agent response:', agentText, 'Event ID:', eventId);
           
           // Store agent response for potential forced alignment
           if (agentText) {
@@ -248,6 +249,7 @@ export function useElevenLabsSimple() {
             };
             
             // Use forced alignment for precise viseme timing
+            console.log('Generating visemes for agent response');
             generatePreciseVisemes(agentText);
           }
           break;
@@ -281,9 +283,12 @@ export function useElevenLabsSimple() {
 
   // Start conversation
   const startConversation = useCallback(async () => {
-    if (state.isConnected || websocketRef.current?.readyState === WebSocket.OPEN) {
+    if (state.isConnected || websocketRef.current?.readyState === WebSocket.OPEN || connectionAttemptRef.current) {
+      console.log('Conversation already started/connecting, skipping duplicate connection');
       return;
     }
+    
+    connectionAttemptRef.current = true;
 
     try {
       setState(prev => ({ ...prev, error: null }));
@@ -298,24 +303,32 @@ export function useElevenLabsSimple() {
       
       ws.onopen = () => {
         console.log('WebSocket connected, sending conversation initiation');
-        // Send conversation initiation
-        ws.send(JSON.stringify({
-          type: 'conversation_initiation_client_data'
-        }));
+        connectionAttemptRef.current = false;
+        // Send conversation initiation - only once per connection
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({
+            type: 'conversation_initiation_client_data'
+          }));
+        }
       };
       
       ws.onmessage = handleMessage;
       
       ws.onclose = () => {
+        console.log('WebSocket connection closed');
+        connectionAttemptRef.current = false;
         setState(prev => ({ 
           ...prev, 
           isConnected: false,
           isListening: false,
           isSpeaking: false 
         }));
+        websocketRef.current = null;
       };
       
-      ws.onerror = () => {
+      ws.onerror = (error) => {
+        console.error('WebSocket error:', error);
+        connectionAttemptRef.current = false;
         setState(prev => ({ ...prev, error: 'Connection failed' }));
       };
       
@@ -357,6 +370,8 @@ export function useElevenLabsSimple() {
       setState(prev => ({ ...prev, isListening: true }));
       
     } catch (error) {
+      console.error('Error starting conversation:', error);
+      connectionAttemptRef.current = false;
       setState(prev => ({ ...prev, error: 'Failed to start conversation' }));
     }
   }, [state.isConnected, handleMessage]);
