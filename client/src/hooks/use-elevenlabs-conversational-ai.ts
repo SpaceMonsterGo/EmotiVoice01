@@ -19,6 +19,9 @@ export function useElevenLabsConversationalAI() {
     conversationId: null
   });
 
+  // Add voiceActivity for compatibility
+  const voiceActivity = state.isListening ? 50 : 0;
+
   const websocketRef = useRef<WebSocket | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -60,6 +63,7 @@ export function useElevenLabsConversationalAI() {
             }
           }
         };
+        console.log('Sending conversation initiation:', initMessage);
         ws.send(JSON.stringify(initMessage));
       };
 
@@ -82,14 +86,24 @@ export function useElevenLabsConversationalAI() {
         }));
       };
 
-      ws.onclose = () => {
-        console.log('WebSocket connection closed');
+      ws.onclose = (event) => {
+        console.log('WebSocket connection closed:', event.code, event.reason);
         setState(prev => ({ 
           ...prev, 
           isConnected: false,
           isListening: false,
           isSpeaking: false
         }));
+        
+        // Try to reconnect if unexpected close
+        if (event.code !== 1000) {
+          console.log('Unexpected close, attempting to reconnect...');
+          setTimeout(() => {
+            if (state.isListening) {
+              connect();
+            }
+          }, 2000);
+        }
       };
 
     } catch (error) {
@@ -143,12 +157,10 @@ export function useElevenLabsConversationalAI() {
 
   // Start listening (microphone input)
   const startListening = useCallback(async () => {
-    if (!state.isConnected || !websocketRef.current) {
-      await connect();
-      return;
-    }
-
     try {
+      console.log('Starting microphone access...');
+      
+      // First get microphone permission
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           sampleRate: 16000,
@@ -159,44 +171,81 @@ export function useElevenLabsConversationalAI() {
       });
 
       streamRef.current = stream;
+      console.log('Microphone access granted');
 
-      // Setup audio context for real-time processing
-      const audioContext = new AudioContext({ sampleRate: 16000 });
-      audioContextRef.current = audioContext;
-
-      const source = audioContext.createMediaStreamSource(stream);
-      const processor = audioContext.createScriptProcessor(4096, 1, 1);
-
-      source.connect(processor);
-      processor.connect(audioContext.destination);
-
-      processor.onaudioprocess = (event) => {
-        if (!websocketRef.current || websocketRef.current.readyState !== WebSocket.OPEN) {
-          return;
-        }
-
-        const inputBuffer = event.inputBuffer.getChannelData(0);
-        
-        // Convert float32 audio to PCM16
-        const pcm16Buffer = new Int16Array(inputBuffer.length);
-        for (let i = 0; i < inputBuffer.length; i++) {
-          pcm16Buffer[i] = Math.max(-32768, Math.min(32767, inputBuffer[i] * 32768));
-        }
-
-        // Convert to base64 and send
-        const base64Audio = btoa(String.fromCharCode(...new Uint8Array(pcm16Buffer.buffer)));
-        websocketRef.current.send(JSON.stringify({
-          user_audio_chunk: base64Audio
-        }));
-      };
-
-      setState(prev => ({ ...prev, isListening: true }));
+      // If not connected, connect now
+      if (!state.isConnected || !websocketRef.current) {
+        setState(prev => ({ ...prev, isListening: true }));
+        await connect();
+        // Wait a bit for connection to establish
+        setTimeout(() => {
+          if (websocketRef.current?.readyState === WebSocket.OPEN) {
+            startAudioProcessing();
+          }
+        }, 1000);
+      } else {
+        setState(prev => ({ ...prev, isListening: true }));
+        startAudioProcessing();
+      }
 
     } catch (error) {
       console.error('Failed to start listening:', error);
       setState(prev => ({ ...prev, error: 'Failed to access microphone' }));
     }
   }, [state.isConnected, connect]);
+
+  // Separate function for audio processing
+  const startAudioProcessing = useCallback(() => {
+    if (!streamRef.current || !websocketRef.current) return;
+
+    try {
+      // Setup audio context for real-time processing
+      const audioContext = new AudioContext({ sampleRate: 16000 });
+      audioContextRef.current = audioContext;
+
+      const source = audioContext.createMediaStreamSource(streamRef.current);
+      
+      // Use newer AudioWorklet if available, fallback to ScriptProcessor
+      if (audioContext.audioWorklet) {
+        console.log('Using AudioWorklet for audio processing');
+        // For now, use ScriptProcessor as it's more compatible
+        setupScriptProcessor(audioContext, source);
+      } else {
+        console.log('Using ScriptProcessor for audio processing');
+        setupScriptProcessor(audioContext, source);
+      }
+
+    } catch (error) {
+      console.error('Failed to start audio processing:', error);
+    }
+  }, []);
+
+  const setupScriptProcessor = (audioContext: AudioContext, source: MediaStreamAudioSourceNode) => {
+    const processor = audioContext.createScriptProcessor(4096, 1, 1);
+
+    source.connect(processor);
+    processor.connect(audioContext.destination);
+
+    processor.onaudioprocess = (event) => {
+      if (!websocketRef.current || websocketRef.current.readyState !== WebSocket.OPEN) {
+        return;
+      }
+
+      const inputBuffer = event.inputBuffer.getChannelData(0);
+      
+      // Convert float32 audio to PCM16
+      const pcm16Buffer = new Int16Array(inputBuffer.length);
+      for (let i = 0; i < inputBuffer.length; i++) {
+        pcm16Buffer[i] = Math.max(-32768, Math.min(32767, inputBuffer[i] * 32768));
+      }
+
+      // Convert to base64 and send
+      const base64Audio = btoa(String.fromCharCode(...new Uint8Array(pcm16Buffer.buffer)));
+      websocketRef.current.send(JSON.stringify({
+        user_audio_chunk: base64Audio
+      }));
+    };
+  };
 
   // Stop listening
   const stopListening = useCallback(() => {
@@ -313,6 +362,7 @@ export function useElevenLabsConversationalAI() {
 
   return {
     ...state,
+    voiceActivity,
     connect,
     disconnect,
     startListening,

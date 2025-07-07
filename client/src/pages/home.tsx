@@ -12,6 +12,7 @@ export default function Home() {
     isSpeaking,
     isProcessing,
     error,
+    voiceActivity,
     toggleListening,
     setVisemeCallback,
     clearError
@@ -61,7 +62,7 @@ export default function Home() {
               <CharacterDisplay
                 isSpeaking={isSpeaking}
                 isListening={isListening}
-                voiceActivity={isListening ? 50 : 0}
+                voiceActivity={voiceActivity}
                 emotionalState="neutral"
                 onVisemeCallbackReady={handleVisemeCallbackReady}
               />
@@ -104,7 +105,7 @@ export default function Home() {
                     <div className="mt-2 w-32 h-2 bg-gray-700 rounded-full overflow-hidden">
                       <div 
                         className="h-full bg-gradient-to-r from-green-400 to-blue-500 transition-all duration-100 animate-pulse"
-                        style={{ width: `${50}%` }}
+                        style={{ width: `${voiceActivity}%` }}
                       />
                     </div>
                   )}
