@@ -32,6 +32,8 @@ export function useElevenLabsVoiceAgent() {
   const visemeCallbackRef = useRef<((viseme: number) => void) | null>(null);
   const animationFrameRef = useRef<number | null>(null);
   const isProcessingMessageRef = useRef<boolean>(false); // Track message processing
+  const currentVisemeTimeouts = useRef<NodeJS.Timeout[]>([]);
+  const isSpeakingRef = useRef<boolean>(false);
 
   // Connect to ElevenLabs Conversational AI WebSocket
   const connectWebSocket = useCallback(async () => {
@@ -86,56 +88,51 @@ export function useElevenLabsVoiceAgent() {
           if (data.type === 'conversation_initiation_metadata') {
             console.log('Conversation initiated:', data.conversation_initiation_metadata_event);
           } else if (data.type === 'audio' && data.audio_event) {
-            setState(prev => ({ ...prev, isSpeaking: true }));
-
-            // Play the audio and trigger visemes
+            // Clear any existing viseme timeouts to prevent overlapping
+            currentVisemeTimeouts.current.forEach(timeout => clearTimeout(timeout));
+            currentVisemeTimeouts.current = [];
+            
+            // ElevenLabs Conversational AI plays audio automatically
+            // We only need to handle visemes and speaking state
+            if (!isSpeakingRef.current) {
+              setState(prev => ({ ...prev, isSpeaking: true }));
+              isSpeakingRef.current = true;
+            }
+            
+            // Generate visemes based on audio data without playing duplicate audio
             const audioData = data.audio_event.audio_base_64;
             if (audioData && visemeCallbackRef.current) {
-              // Play audio with visemes inline
-              (async () => {
-                try {
-                  // Convert base64 to audio blob
-                  const audioBytes = atob(audioData);
-                  const audioArray = new Uint8Array(audioBytes.length);
-                  for (let i = 0; i < audioBytes.length; i++) {
-                    audioArray[i] = audioBytes.charCodeAt(i);
-                  }
-                  const audioBlob = new Blob([audioArray], { type: 'audio/wav' });
-                  const audioUrl = URL.createObjectURL(audioBlob);
-
-                  const audio = new Audio(audioUrl);
-
-                  // Generate visemes during playback
-                  audio.onplay = () => {
+              // Estimate audio duration from base64 data size
+              const audioBytes = atob(audioData);
+              const estimatedDuration = audioBytes.length / (16000 * 2); // Assuming 16kHz 16-bit
+              
+              if (estimatedDuration > 0) {
+                const visemeCount = Math.floor(estimatedDuration * 10);
+                
+                for (let i = 0; i < visemeCount; i++) {
+                  const timeout = setTimeout(() => {
                     if (visemeCallbackRef.current) {
-                      const duration = audio.duration || 2;
-                      const visemeCount = Math.floor(duration * 10);
-
-                      for (let i = 0; i < visemeCount; i++) {
-                        setTimeout(() => {
-                          if (visemeCallbackRef.current) {
-                            const viseme = Math.floor(Math.random() * 15) + 1;
-                            visemeCallbackRef.current(viseme);
-                          }
-                        }, (i * duration * 1000) / visemeCount);
-                      }
+                      const viseme = Math.floor(Math.random() * 15) + 1;
+                      visemeCallbackRef.current(viseme);
                     }
-                  };
-
-                  audio.onended = () => {
-                    setState(prev => ({ ...prev, isSpeaking: false }));
-                    if (visemeCallbackRef.current) {
-                      visemeCallbackRef.current(0);
-                    }
-                    URL.revokeObjectURL(audioUrl);
-                  };
-
-                  await audio.play();
-                } catch (error) {
-                  console.error('Error playing audio:', error);
-                  setState(prev => ({ ...prev, isSpeaking: false }));
+                  }, (i * estimatedDuration * 1000) / visemeCount);
+                  
+                  currentVisemeTimeouts.current.push(timeout);
                 }
-              })();
+                
+                // Set speaking to false after estimated duration
+                const endTimeout = setTimeout(() => {
+                  setState(prev => ({ ...prev, isSpeaking: false }));
+                  isSpeakingRef.current = false;
+                  if (visemeCallbackRef.current) {
+                    visemeCallbackRef.current(0);
+                  }
+                  // Clear the timeout array
+                  currentVisemeTimeouts.current = [];
+                }, estimatedDuration * 1000);
+                
+                currentVisemeTimeouts.current.push(endTimeout);
+              }
             }
           } else if (data.type === 'interruption') {
             setState(prev => ({ ...prev, isSpeaking: false }));
@@ -283,7 +280,13 @@ export function useElevenLabsVoiceAgent() {
       websocketRef.current.close();
       websocketRef.current = null;
     }
+    
+    // Clear all viseme timeouts
+    currentVisemeTimeouts.current.forEach(timeout => clearTimeout(timeout));
+    currentVisemeTimeouts.current = [];
+    
     stopRecording();
+    isSpeakingRef.current = false;
     setState(prev => ({ 
       ...prev, 
       isConnected: false, 
