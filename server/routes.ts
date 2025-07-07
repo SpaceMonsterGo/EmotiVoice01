@@ -4,9 +4,8 @@ import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
 import { insertMessageSchema } from "@shared/schema";
 import { z } from "zod";
-import { generateConversationResponse } from "./gemini.js";
 import { generateSpeechWithTimestamps } from "./elevenlabs-tts.js";
-import { convertTimestampsToVisemes } from "./viseme-converter.js";
+import { PhonemeConverter } from "./phoneme-converter.js";
 import path from "path";
 import fs from "fs";
 
@@ -211,60 +210,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // New conversation API with Gemini + ElevenLabs TTS
-  app.post('/api/conversation/message', async (req, res) => {
+  // Simplified conversation processing endpoint
+  app.post('/api/conversation/process', async (req, res) => {
     try {
-      const { message: userMessage, conversationId } = req.body;
+      const { message, conversationId } = req.body;
       
-      if (!userMessage || typeof userMessage !== 'string') {
+      if (!message || typeof message !== 'string') {
         return res.status(400).json({ error: 'Message is required' });
       }
 
-      // Get conversation history for context
-      const conversation = await storage.getConversation(conversationId);
-      const messages = conversationId ? await storage.getMessagesByConversationId(conversationId) : [];
+      // For now, use a simple demo response (ElevenLabs Conversational AI requires WebSocket)
+      // TODO: Implement proper WebSocket integration with ElevenLabs Conversational AI
+      const aiResponse = `Thank you for saying "${message}". I'm a voice agent powered by ElevenLabs and I can see you clearly! I'm excited to demonstrate precise lip synchronization with word-level timing. How can I help you today?`;
       
-      // Generate conversation history for context
-      const conversationHistory = messages.slice(-10).map(msg => 
-        `${msg.sender === 'user' ? 'Human' : 'Emoti'}: ${msg.content}`
-      );
-
-      // Generate response using Gemini
-      const aiResponse = await generateConversationResponse(userMessage, conversationHistory);
-      
-      // Generate speech with timestamps using ElevenLabs
+      // Generate speech with word timestamps using ElevenLabs TTS
       const speechData = await generateSpeechWithTimestamps(aiResponse);
       
-      // Convert timestamps to visemes
-      const visemes = convertTimestampsToVisemes(speechData.timestamps);
+      // Convert word timestamps to phoneme-based viseme timing
+      const visemeTimings = speechData.timestamps?.length > 0 
+        ? PhonemeConverter.convertWordsToVisemes(speechData.timestamps)
+        : PhonemeConverter.generateVisemeTimeline(aiResponse, 3.0); // Fallback: 3 second duration
       
-      // Store both messages in conversation
-      if (conversationId) {
-        await storage.createMessage({
-          conversationId,
-          sender: 'user',
-          content: userMessage,
-          timestamp: new Date()
-        });
-        
-        await storage.createMessage({
-          conversationId,
-          sender: 'ai',
-          content: aiResponse,
-          timestamp: new Date()
-        });
-      }
+      // Save audio as base64 for client playback
+      const audioBase64 = `data:audio/wav;base64,${speechData.audio.toString('base64')}`;
       
-      // Return response with audio and viseme data
       res.json({
         response: aiResponse,
-        audio: speechData.audio.toString('base64'),
-        visemes: visemes,
-        timestamps: speechData.timestamps
+        audioUrl: audioBase64,
+        visemeTimings: visemeTimings,
+        wordTimings: speechData.timestamps || []
       });
       
     } catch (error) {
-      console.error('Error in conversation:', error);
+      console.error('Error processing conversation:', error);
       res.status(500).json({ error: 'Failed to process conversation' });
     }
   });
