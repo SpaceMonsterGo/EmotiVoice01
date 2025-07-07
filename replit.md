@@ -104,6 +104,12 @@ Changelog:
   - Fixed UI hanging on processing screen during voice calls
   - Implemented non-blocking voice recording stop for real-time experience
   - Verified ElevenLabs connection and Rive character loading working correctly
+- July 07, 2025: Redesigned to pure audio-based conversational system:
+  - Removed complex dual-mode architecture (Gemini/ElevenLabs separation)
+  - Implemented direct ElevenLabs Conversational AI WebSocket integration
+  - Created PhonemeConverter for word-to-viseme mapping without Docker dependency
+  - Simplified UI to single large microphone button for voice-only interaction
+  - ElevenLabs agent auto-introduces itself when conversation starts
 
 ## User Preferences
 
