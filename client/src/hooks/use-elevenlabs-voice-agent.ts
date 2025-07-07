@@ -34,6 +34,13 @@ export function useElevenLabsVoiceAgent() {
 
   // Connect to ElevenLabs Conversational AI WebSocket
   const connectWebSocket = useCallback(async () => {
+    // Prevent multiple simultaneous connections
+    if (websocketRef.current && 
+        (websocketRef.current.readyState === WebSocket.CONNECTING || 
+         websocketRef.current.readyState === WebSocket.OPEN)) {
+      return;
+    }
+    
     try {
       setState(prev => ({ ...prev, isProcessing: true, error: null }));
 
@@ -53,12 +60,83 @@ export function useElevenLabsVoiceAgent() {
           isConnected: true, 
           isProcessing: false 
         }));
+        
+        // Send conversation initiation only once
+        const initMessage = {
+          type: "conversation_initiation_client_data",
+          conversation_config_override: {
+            agent: {
+              first_message: "Hello! I'm your AI voice assistant. How can I help you today?",
+              language: "en"
+            }
+          }
+        };
+        ws.send(JSON.stringify(initMessage));
       });
 
       ws.addEventListener('message', (event) => {
         try {
           const data = JSON.parse(event.data);
-          handleWebSocketMessage(data);
+          console.log('Received WebSocket message:', data);
+          
+          // Handle different ElevenLabs message types
+          if (data.type === 'conversation_initiation_metadata') {
+            console.log('Conversation initiated:', data.conversation_initiation_metadata_event);
+          } else if (data.type === 'audio' && data.audio_event) {
+            setState(prev => ({ ...prev, isSpeaking: true }));
+            
+            // Play the audio and trigger visemes
+            const audioData = data.audio_event.audio_base_64;
+            if (audioData && visemeCallbackRef.current) {
+              // Play audio with visemes inline
+              (async () => {
+                try {
+                  // Convert base64 to audio blob
+                  const audioBytes = atob(audioData);
+                  const audioArray = new Uint8Array(audioBytes.length);
+                  for (let i = 0; i < audioBytes.length; i++) {
+                    audioArray[i] = audioBytes.charCodeAt(i);
+                  }
+                  const audioBlob = new Blob([audioArray], { type: 'audio/wav' });
+                  const audioUrl = URL.createObjectURL(audioBlob);
+                  
+                  const audio = new Audio(audioUrl);
+                  
+                  // Generate visemes during playback
+                  audio.onplay = () => {
+                    if (visemeCallbackRef.current) {
+                      const duration = audio.duration || 2;
+                      const visemeCount = Math.floor(duration * 10);
+                      
+                      for (let i = 0; i < visemeCount; i++) {
+                        setTimeout(() => {
+                          if (visemeCallbackRef.current) {
+                            const viseme = Math.floor(Math.random() * 15) + 1;
+                            visemeCallbackRef.current(viseme);
+                          }
+                        }, (i * duration * 1000) / visemeCount);
+                      }
+                    }
+                  };
+                  
+                  audio.onended = () => {
+                    setState(prev => ({ ...prev, isSpeaking: false }));
+                    if (visemeCallbackRef.current) {
+                      visemeCallbackRef.current(0);
+                    }
+                    URL.revokeObjectURL(audioUrl);
+                  };
+                  
+                  await audio.play();
+                } catch (error) {
+                  console.error('Error playing audio:', error);
+                  setState(prev => ({ ...prev, isSpeaking: false }));
+                }
+              })();
+            }
+          } else if (data.type === 'interruption') {
+            setState(prev => ({ ...prev, isSpeaking: false }));
+          }
         } catch (error) {
           console.error('Error parsing WebSocket message:', error);
         }
@@ -95,65 +173,21 @@ export function useElevenLabsVoiceAgent() {
     }
   }, []);
 
-  // Handle WebSocket messages
-  const handleWebSocketMessage = useCallback((data: any) => {
-    console.log('Received WebSocket message:', data);
-    
-    // Handle ElevenLabs Agent messages
-    if (data.source === 'ai' && data.message) {
-      setState(prev => ({ ...prev, isSpeaking: true }));
-      
-      // Trigger viseme animation based on message content
-      if (visemeCallbackRef.current) {
-        simulateVisemeAnimation(data.message);
-      }
-      
-      // Auto-stop speaking after a delay
-      setTimeout(() => {
-        setState(prev => ({ ...prev, isSpeaking: false }));
-      }, data.message.length * 50); // Rough estimation
-    }
-  }, []);
 
-  // Simulate viseme animation for demo purposes
-  const simulateVisemeAnimation = useCallback((message: string) => {
-    if (!visemeCallbackRef.current) return;
-    
-    const words = message.split(' ');
-    let delay = 0;
-    
-    words.forEach((word, index) => {
-      setTimeout(() => {
-        if (visemeCallbackRef.current) {
-          // Generate pseudo-random visemes based on word
-          const viseme = (word.charCodeAt(0) % 10) + 1;
-          visemeCallbackRef.current(viseme);
-          
-          // Reset to neutral after word
-          setTimeout(() => {
-            if (visemeCallbackRef.current) {
-              visemeCallbackRef.current(0);
-            }
-          }, 200);
-        }
-      }, delay);
-      
-      delay += 300; // 300ms per word
-    });
-  }, []);
+
+
 
   // Start voice recording
   const startRecording = useCallback(async () => {
     try {
-      if (!state.isConnected) {
-        await connectWebSocket();
-        // Wait a moment for connection to establish
-        setTimeout(() => {
-          if (websocketRef.current?.readyState === WebSocket.OPEN) {
-            startRecording();
-          }
-        }, 1000);
+      // If already connecting or connected, don't create another connection
+      if (state.isProcessing || websocketRef.current?.readyState === WebSocket.CONNECTING) {
         return;
+      }
+      
+      if (!state.isConnected && websocketRef.current?.readyState !== WebSocket.OPEN) {
+        await connectWebSocket();
+        return; // Let the connection establish first
       }
 
       const stream = await navigator.mediaDevices.getUserMedia({ 
@@ -174,7 +208,7 @@ export function useElevenLabsVoiceAgent() {
         error: 'Failed to start recording' 
       }));
     }
-  }, [state.isConnected, connectWebSocket]);
+  }, [connectWebSocket]);
 
   // Stop voice recording
   const stopRecording = useCallback(() => {
