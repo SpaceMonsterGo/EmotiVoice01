@@ -231,7 +231,7 @@ export function useElevenLabsSimple() {
 
         case 'user_transcript':
           const userTranscript = data.user_transcription_event?.user_transcript;
-          console.log('User transcript received:', userTranscript);
+          console.log('✓ User transcript received:', userTranscript);
           
           // Store transcript for potential forced alignment
           if (userTranscript) {
@@ -288,7 +288,7 @@ export function useElevenLabsSimple() {
 
         case 'ping':
           // Respond to ping to keep connection alive - critical for ElevenLabs protocol
-          console.log('Received ping, sending pong');
+          // (Reduced logging to avoid clutter)
           if (websocketRef.current?.readyState === WebSocket.OPEN) {
             websocketRef.current.send(JSON.stringify({
               type: 'pong',
@@ -365,11 +365,22 @@ export function useElevenLabsSimple() {
         setState(prev => ({ ...prev, error: 'Connection failed' }));
       };
       
-      // Start microphone
+      // Start microphone with enhanced settings
       const stream = await navigator.mediaDevices.getUserMedia({ 
-        audio: { sampleRate: 16000, channelCount: 1 } 
+        audio: { 
+          sampleRate: 16000, 
+          channelCount: 1,
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        } 
       });
       streamRef.current = stream;
+      
+      // Log audio track info for debugging
+      const audioTrack = stream.getAudioTracks()[0];
+      console.log('🎤 Audio track settings:', audioTrack.getSettings());
+      console.log('🎤 Audio track constraints:', audioTrack.getConstraints());
       
       // Setup audio processing for ElevenLabs (needs PCM16 format)
       const audioContext = new AudioContext({ sampleRate: 16000 });
@@ -388,17 +399,33 @@ export function useElevenLabsSimple() {
         if (ws.readyState === WebSocket.OPEN && state.isConnected) {
           const inputBuffer = event.inputBuffer.getChannelData(0);
           
-          // Convert float32 to PCM16 format as expected by ElevenLabs
-          const pcm16Buffer = new Int16Array(inputBuffer.length);
+          // Check for voice activity (simple volume detection)
+          let hasAudio = false;
+          let maxVolume = 0;
           for (let i = 0; i < inputBuffer.length; i++) {
-            pcm16Buffer[i] = Math.max(-32768, Math.min(32767, inputBuffer[i] * 32768));
+            const volume = Math.abs(inputBuffer[i]);
+            maxVolume = Math.max(maxVolume, volume);
+            if (volume > 0.01) { // Threshold for voice activity
+              hasAudio = true;
+            }
           }
           
-          // Convert to base64 and send according to ElevenLabs protocol
-          const base64Audio = btoa(String.fromCharCode(...new Uint8Array(pcm16Buffer.buffer)));
-          ws.send(JSON.stringify({
-            user_audio_chunk: base64Audio
-          }));
+          // Only send audio if there's actual voice activity
+          if (hasAudio) {
+            // Convert float32 to PCM16 format as expected by ElevenLabs
+            const pcm16Buffer = new Int16Array(inputBuffer.length);
+            for (let i = 0; i < inputBuffer.length; i++) {
+              pcm16Buffer[i] = Math.max(-32768, Math.min(32767, inputBuffer[i] * 32768));
+            }
+            
+            // Convert to base64 and send according to ElevenLabs protocol
+            const base64Audio = btoa(String.fromCharCode(...new Uint8Array(pcm16Buffer.buffer)));
+            
+            console.log('Sending audio chunk, volume:', maxVolume.toFixed(4), 'size:', base64Audio.length);
+            ws.send(JSON.stringify({
+              user_audio_chunk: base64Audio
+            }));
+          }
         }
       };
       
