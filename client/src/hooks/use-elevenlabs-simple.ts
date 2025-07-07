@@ -97,15 +97,26 @@ export function useElevenLabsSimple() {
               source.buffer = audioBuffer;
               source.connect(audioContext.destination);
               
+              // Generate visemes during playback
+              const duration = audioBuffer.duration;
+              console.log('Playing audio, duration:', duration);
+              generateVisemes(duration);
+              
               source.onended = () => {
+                console.log('Audio playback ended');
                 setState(prev => ({ ...prev, isSpeaking: false }));
               };
               
-              // Generate visemes during playback
-              const duration = audioBuffer.duration;
-              generateVisemes(duration);
-              
-              source.start();
+              // Resume audio context if suspended
+              if (audioContext.state === 'suspended') {
+                audioContext.resume().then(() => {
+                  source.start();
+                  console.log('Audio started after resume');
+                });
+              } else {
+                source.start();
+                console.log('Audio started immediately');
+              }
             } catch (error) {
               console.error('Audio playback failed:', error);
               setState(prev => ({ ...prev, isSpeaking: false }));
@@ -157,6 +168,7 @@ export function useElevenLabsSimple() {
       websocketRef.current = ws;
       
       ws.onopen = () => {
+        console.log('WebSocket connected, sending conversation initiation');
         // Send conversation initiation
         ws.send(JSON.stringify({
           type: 'conversation_initiation_client_data'
@@ -190,16 +202,22 @@ export function useElevenLabsSimple() {
       
       mediaRecorder.ondataavailable = async (event) => {
         if (event.data.size > 0 && ws.readyState === WebSocket.OPEN) {
-          const arrayBuffer = await event.data.arrayBuffer();
-          const base64Audio = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
-          
-          ws.send(JSON.stringify({
-            user_audio_chunk: base64Audio
-          }));
+          try {
+            const arrayBuffer = await event.data.arrayBuffer();
+            const base64Audio = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+            
+            ws.send(JSON.stringify({
+              user_audio_chunk: base64Audio
+            }));
+            console.log('Sent audio chunk, size:', event.data.size);
+          } catch (error) {
+            console.error('Error processing audio chunk:', error);
+          }
         }
       };
       
       mediaRecorder.start(250); // 250ms chunks
+      console.log('MediaRecorder started with 250ms chunks');
       setState(prev => ({ ...prev, isListening: true }));
       
     } catch (error) {
