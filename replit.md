@@ -131,6 +131,9 @@ Changelog:
   - Implemented text-based viseme generation for realistic lip sync matching agent responses
   - Added forced alignment data collection infrastructure for future phoneme-level precision
   - Created ForcedAlignmentProcessor with phoneme-to-viseme mapping system
+  - Implemented ElevenLabs forced alignment using TTS WebSocket with character-level timestamps
+  - Added precise viseme timing with /api/elevenlabs/align endpoint for perfect lip sync
+  - Integrated real-time character-to-viseme conversion matching Rive specification
 
 ## User Preferences
 

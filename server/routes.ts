@@ -263,5 +263,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ElevenLabs forced alignment endpoint
+  app.post('/api/elevenlabs/align', async (req, res) => {
+    try {
+      const { text, voiceId } = req.body;
+      
+      if (!text || !voiceId) {
+        return res.status(400).json({ error: 'Text and voiceId are required' });
+      }
+
+      const { elevenLabsAligner } = await import('./elevenlabs-alignment.js');
+      
+      // Get alignment data from ElevenLabs
+      const alignmentResult = await elevenLabsAligner.getAlignmentData(text, voiceId);
+      
+      if (!alignmentResult) {
+        return res.status(500).json({ error: 'Failed to get alignment data' });
+      }
+
+      // Convert to viseme timestamps
+      const visemes = elevenLabsAligner.convertAlignmentToVisemes(alignmentResult.normalizedAlignment);
+      
+      res.json({
+        visemes,
+        alignment: alignmentResult.alignment,
+        normalizedAlignment: alignmentResult.normalizedAlignment,
+        audioDuration: alignmentResult.audio.length / (16000 * 2) // Assuming 16kHz 16-bit audio
+      });
+    } catch (error) {
+      console.error('Error in forced alignment:', error);
+      res.status(500).json({ error: 'Forced alignment failed' });
+    }
+  });
+
+  // Get available ElevenLabs voices for alignment
+  app.get('/api/elevenlabs/voices', async (req, res) => {
+    try {
+      const { elevenLabsAligner } = await import('./elevenlabs-alignment.js');
+      const voices = await elevenLabsAligner.getAvailableVoices();
+      res.json({ voices });
+    } catch (error) {
+      console.error('Error getting voices:', error);
+      res.status(500).json({ error: 'Failed to get voices' });
+    }
+  });
+
   return httpServer;
 }

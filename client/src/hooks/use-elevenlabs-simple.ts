@@ -110,6 +110,40 @@ export function useElevenLabsSimple() {
     }, chars.length * charDuration);
   }, []);
 
+  // Generate precise visemes using ElevenLabs forced alignment
+  const generatePreciseVisemes = useCallback(async (text: string) => {
+    if (!visemeCallbackRef.current || !text) return;
+
+    try {
+      // Use a default voice ID - in production, this should be configurable
+      const defaultVoiceId = 'EXAVITQu4vr4xnSDxMaL'; // Bella voice (neutral)
+      
+      const { getVisemeAlignment, playVisemeSequence } = await import('../lib/elevenlabs-alignment');
+      
+      // Get precise timing from ElevenLabs
+      const visemes = await getVisemeAlignment(text, defaultVoiceId);
+      
+      if (visemes.length > 0) {
+        console.log('Using ElevenLabs forced alignment with', visemes.length, 'visemes');
+        
+        // Play the precise viseme sequence
+        playVisemeSequence(visemes, (viseme) => {
+          if (visemeCallbackRef.current) {
+            visemeCallbackRef.current(viseme);
+          }
+        });
+      } else {
+        // Fallback to text-based visemes
+        console.log('Fallback to text-based visemes');
+        generateTextBasedVisemes(text);
+      }
+    } catch (error) {
+      console.error('Error with forced alignment, using fallback:', error);
+      // Fallback to text-based visemes
+      generateTextBasedVisemes(text);
+    }
+  }, [generateTextBasedVisemes]);
+
   // Handle WebSocket messages
   const handleMessage = useCallback((event: MessageEvent) => {
     try {
@@ -213,8 +247,8 @@ export function useElevenLabsSimple() {
               timestamp: Date.now()
             };
             
-            // Generate visemes based on the text content for more realistic lip sync
-            generateTextBasedVisemes(agentText);
+            // Use forced alignment for precise viseme timing
+            generatePreciseVisemes(agentText);
           }
           break;
 
