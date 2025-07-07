@@ -196,28 +196,35 @@ export function useElevenLabsSimple() {
       });
       streamRef.current = stream;
       
-      // Setup MediaRecorder for audio streaming
-      const mediaRecorder = new MediaRecorder(stream);
-      mediaRecorderRef.current = mediaRecorder;
+      // Setup audio processing for ElevenLabs (needs PCM16 format)
+      const audioContext = new AudioContext({ sampleRate: 16000 });
+      audioContextRef.current = audioContext;
       
-      mediaRecorder.ondataavailable = async (event) => {
-        if (event.data.size > 0 && ws.readyState === WebSocket.OPEN) {
-          try {
-            const arrayBuffer = await event.data.arrayBuffer();
-            const base64Audio = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
-            
-            ws.send(JSON.stringify({
-              user_audio_chunk: base64Audio
-            }));
-            console.log('Sent audio chunk, size:', event.data.size);
-          } catch (error) {
-            console.error('Error processing audio chunk:', error);
+      const source = audioContext.createMediaStreamSource(stream);
+      const processor = audioContext.createScriptProcessor(4096, 1, 1);
+      
+      source.connect(processor);
+      processor.connect(audioContext.destination);
+      
+      processor.onaudioprocess = (event) => {
+        if (ws.readyState === WebSocket.OPEN) {
+          const inputBuffer = event.inputBuffer.getChannelData(0);
+          
+          // Convert float32 to PCM16
+          const pcm16Buffer = new Int16Array(inputBuffer.length);
+          for (let i = 0; i < inputBuffer.length; i++) {
+            pcm16Buffer[i] = Math.max(-32768, Math.min(32767, inputBuffer[i] * 32768));
           }
+          
+          // Convert to base64 and send
+          const base64Audio = btoa(String.fromCharCode(...new Uint8Array(pcm16Buffer.buffer)));
+          ws.send(JSON.stringify({
+            user_audio_chunk: base64Audio
+          }));
         }
       };
       
-      mediaRecorder.start(250); // 250ms chunks
-      console.log('MediaRecorder started with 250ms chunks');
+      console.log('Audio processing started with PCM16 format');
       setState(prev => ({ ...prev, isListening: true }));
       
     } catch (error) {
@@ -227,11 +234,6 @@ export function useElevenLabsSimple() {
 
   // Stop conversation
   const stopConversation = useCallback(() => {
-    if (mediaRecorderRef.current) {
-      mediaRecorderRef.current.stop();
-      mediaRecorderRef.current = null;
-    }
-    
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop());
       streamRef.current = null;
