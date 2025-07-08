@@ -42,8 +42,9 @@ export function useElevenLabsConversation() {
       console.log('✓ AI message received:', message);
       const messageText = message.text || message.message || '';
       
-      if (messageText.trim()) {
-        // Generate visemes for the AI response
+      // Only process AI messages for visemes, not user transcripts
+      if (messageText.trim() && message.source === 'ai') {
+        // Generate visemes ONLY for AI responses using ElevenLabs alignment
         if (window.visemeCallback) {
           try {
             const response = await fetch('/api/elevenlabs/align', {
@@ -63,7 +64,7 @@ export function useElevenLabsConversation() {
               data.visemes.forEach((viseme: any, index: number) => {
                 setTimeout(() => {
                   window.visemeCallback(viseme.viseme);
-                  console.log(`Viseme ${viseme.viseme} for char '${viseme.char}' at ${viseme.start}ms`);
+                  console.log(`Viseme ${viseme.viseme} for phoneme '${viseme.char}' at ${viseme.start}ms (duration: ${viseme.end - viseme.start}ms)`);
                 }, viseme.start);
               });
               
@@ -77,6 +78,9 @@ export function useElevenLabsConversation() {
             console.error('Failed to generate visemes:', error);
           }
         }
+      } else if (message.source === 'user') {
+        // For user messages, just log without processing visemes
+        console.log('User transcript (no visemes):', messageText);
       }
     },
     onAudioStart: () => {

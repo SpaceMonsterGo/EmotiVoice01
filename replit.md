@@ -189,6 +189,12 @@ Changelog:
   - Added consecutive identical viseme merging to reduce redundancy
   - Enhanced logging to show phoneme duration and timing information
   - Fixed unnaturally fast lip sync by grouping at vowel/consonant boundaries
+- July 08, 2025: Optimized viseme processing to reduce lag:
+  - Restricted viseme generation to AI responses only (not user speech input)
+  - Added explicit source checking to prevent processing user transcripts
+  - Improved logging to distinguish between AI and user messages
+  - Eliminated unnecessary alignment API calls for outbound audio
+  - Reduced system lag by processing visemes only when needed for character animation
 
 ## User Preferences
 
