@@ -89,7 +89,9 @@ export function useElevenLabsConversation() {
   const startConversation = useCallback(async () => {
     try {
       setState(prev => ({ ...prev, error: null }));
-      await startSession({ agentId: import.meta.env.ELEVENLABS_AGENT_ID || '' });
+      const agentId = import.meta.env.ELEVENLABS_AGENT_ID || '';
+      console.log('Starting conversation with agent ID:', agentId);
+      await startSession({ agentId });
       setState(prev => ({ 
         ...prev, 
         isRecording: true, 
@@ -123,12 +125,17 @@ export function useElevenLabsConversation() {
     }
   }, [endSession, transcript]);
 
+  const clearError = useCallback(() => {
+    setState(prev => ({ ...prev, error: null }));
+  }, []);
+
   return {
     ...state,
     isSpeaking: isSpeaking || state.isSpeaking,
     transcript: transcript || state.transcript,
     status,
     startConversation,
-    stopConversation
+    stopConversation,
+    clearError
   };
 }

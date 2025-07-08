@@ -15,6 +15,7 @@ export default function Home() {
     status,
     startConversation,
     stopConversation,
+    clearError,
   } = useElevenLabsConversation();
 
   // Handle viseme callback from character display
