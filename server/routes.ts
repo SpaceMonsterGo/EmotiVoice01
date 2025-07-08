@@ -4,7 +4,8 @@ import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
 import { insertMessageSchema } from "@shared/schema";
 import { z } from "zod";
-// Removed elevenlabs-tts and phoneme-converter imports - using elevenlabs-alignment instead
+import { generateSpeechWithTimestamps } from "./elevenlabs-tts.js";
+import { PhonemeConverter } from "./phoneme-converter.js";
 import path from "path";
 import fs from "fs";
 import multer from "multer";
@@ -80,31 +81,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(500).json({ error: 'ElevenLabs API key not configured' });
       }
       
+      // Generate a properly authenticated signed URL for the ElevenLabs conversational AI
       const agentId = process.env.ELEVENLABS_AGENT_ID;
       if (!agentId) {
         return res.status(500).json({ error: 'ElevenLabs Agent ID not configured' });
       }
       
-      // Get signed URL from ElevenLabs API for proper authentication
-      const response = await fetch(
-        `https://api.elevenlabs.io/v1/convai/conversation/get_signed_url?agent_id=${agentId}`,
-        {
-          method: 'GET',
-          headers: {
-            'xi-api-key': apiKey,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
-      
-      if (!response.ok) {
-        throw new Error(`ElevenLabs API error: ${response.status}`);
-      }
-      
-      const data = await response.json();
+      // Include API key in the WebSocket URL for authentication as per ElevenLabs documentation
+      const signedUrl = `wss://api.elevenlabs.io/v1/convai/conversation?agent_id=${agentId}&xi-api-key=${apiKey}`;
       
       res.json({ 
-        signedUrl: data.signed_url,
+        signedUrl,
         agentId 
       });
     } catch (error) {

@@ -195,14 +195,6 @@ Changelog:
   - Improved logging to distinguish between AI and user messages
   - Eliminated unnecessary alignment API calls for outbound audio
   - Reduced system lag by processing visemes only when needed for character animation
-- July 08, 2025: Cleaned up project structure to reduce size:
-  - Removed unused hook files (use-elevenlabs-simple, use-gemini-voice-agent, use-voice-agent, etc.)
-  - Deleted unused server files (elevenlabs-tts, forced-alignment-processor, gemini, gentle-aligner, etc.)  
-  - Removed backup files (home-backup.tsx, test-rive.ts)
-  - Eliminated unused library files (audio-viseme-analyzer, elevenlabs, viseme-mapping)
-  - Removed attached assets folder
-  - Streamlined to core files: use-elevenlabs-conversation hook, elevenlabs-alignment service, character display
-  - Reduced project size from large warnings to manageable 12MB (excluding node_modules)
 
 ## User Preferences
 
