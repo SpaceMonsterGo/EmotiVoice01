@@ -1,0 +1,188 @@
+import React, { useState, useEffect } from 'react';
+import { Mic, MicOff, Volume2 } from 'lucide-react';
+import { useConversation as useElevenLabsConversation } from '@elevenlabs/react';
+import { useConversation } from '../contexts/ConversationContext';
+import { Emotion } from '../types';
+
+
+const ELEVENLABS_AGENT_ID = "agent_01jx0kds92fv9rkw9ym9skg6m3";
+
+const VoiceInteraction: React.FC = () => {
+  const { addMessage, setIsSpeaking, setCurrentEmotion } = useConversation();
+  const [error, setError] = useState<string | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [elevenLabsDetectedEmotion, setElevenLabsDetectedEmotion] = useState<Emotion>('neutral');
+
+  const {
+    status,
+    startSession,
+    endSession,
+    isSpeaking,
+    transcript
+  } = useElevenLabsConversation({
+    agentId: ELEVENLABS_AGENT_ID,
+    clientTools: {
+      emotion_detector: async ({ emotion_detected }: { emotion_detected: string }) => {
+        console.log('🎭 Emotion detected by ElevenLabs:', emotion_detected);
+        
+        // Map ElevenLabs emotion to our emotion type
+        const mappedEmotion = mapElevenLabsEmotion(emotion_detected);
+        setElevenLabsDetectedEmotion(mappedEmotion);
+        
+        // Update the current emotion immediately for the animated face
+        setCurrentEmotion(mappedEmotion);
+        
+        return `Emotion "${emotion_detected}" has been detected and applied.`;
+      }
+    },
+    onMessage: async (message) => {
+      console.log('Received message from AI:', message);
+      
+      // Ensure message.text is defined before processing
+      const messageText = message.text || message.message || '';
+      if (messageText.trim()) {
+        console.log('Processing AI message:', messageText);
+        
+        // Use the emotion detected by ElevenLabs
+        addMessage({
+          text: messageText,
+          sender: 'ai',
+          emotion: elevenLabsDetectedEmotion
+        });
+      }
+    },
+    onAudioStart: () => {
+      console.log('AI started speaking');
+      setIsSpeaking(true);
+    },
+    onAudioEnd: () => {
+      console.log('AI stopped speaking');
+      setIsSpeaking(false);
+      // Set to listening state when AI finishes speaking
+      setCurrentEmotion('listening');
+    },
+    onError: (error) => {
+      console.error('ElevenLabs error:', error);
+      setError('Error in conversation: ' + error.message);
+      setIsRecording(false);
+      // Revert to neutral on error
+      setCurrentEmotion('neutral');
+      setElevenLabsDetectedEmotion('neutral');
+    }
+  });
+
+  // Map ElevenLabs emotion strings to our Emotion type
+  const mapElevenLabsEmotion = (emotion: string): Emotion => {
+    const emotionMap: Record<string, Emotion> = {
+      'happy': 'happy',
+      'joy': 'happy',
+      'excited': 'happy',
+      'sad': 'sad',
+      'depressed': 'sad',
+      'angry': 'angry',
+      'mad': 'angry',
+      'furious': 'angry',
+      'surprised': 'surprised',
+      'shocked': 'surprised',
+      'amazed': 'surprised',
+      'serious': 'serious',
+      'focused': 'serious',
+      'sarcastic': 'sarcastic',
+      'ironic': 'sarcastic',
+      'laughing': 'laughing',
+      'funny': 'laughing',
+      'amused': 'laughing',
+      'bored': 'bored',
+      'tired': 'bored',
+      'listening': 'listening',
+      'attentive': 'listening',
+      'neutral': 'neutral'
+    };
+
+    const lowerEmotion = emotion.toLowerCase();
+    return emotionMap[lowerEmotion] || 'neutral';
+  };
+
+  useEffect(() => {
+    // Request microphone permission when component mounts
+    const requestMicrophonePermission = async () => {
+      try {
+        await navigator.mediaDevices.getUserMedia({ audio: true });
+      } catch (err) {
+        setError('Microphone access denied. Please enable microphone access to use this feature.');
+      }
+    };
+    requestMicrophonePermission();
+  }, []);
+
+  useEffect(() => {
+    // Detect when AI stops speaking and set emotion to listening
+    if (!isSpeaking) {
+      console.log('AI stopped speaking, setting emotion to listening');
+      setCurrentEmotion('listening');
+    }
+  }, [isSpeaking, setCurrentEmotion]);
+
+  const handleMicClick = async () => {
+    try {
+      if (isRecording) {
+        console.log('Ending session...');
+        await endSession();
+        setIsRecording(false);
+        
+        // Reset to neutral emotion when session ends
+        setCurrentEmotion('neutral');
+        setElevenLabsDetectedEmotion('neutral');
+        
+        // Add user message if transcript exists
+        if (transcript && transcript.trim()) {
+          console.log('Adding user message:', transcript);
+          // Use the emotion detected by ElevenLabs for user message
+          addMessage({
+            text: transcript,
+            sender: 'user',
+            emotion: elevenLabsDetectedEmotion
+          });
+        }
+      } else {
+        console.log('Starting session...');
+        setError(null);
+        // Reset emotion state when starting new session
+        setElevenLabsDetectedEmotion('neutral');
+        setCurrentEmotion('listening');
+        await startSession({ agentId: ELEVENLABS_AGENT_ID });
+        setIsRecording(true);
+      }
+    } catch (err) {
+      console.error('Failed to handle microphone:', err);
+      setError('Failed to handle microphone: ' + (err instanceof Error ? err.message : String(err)));
+      setIsRecording(false);
+      // Revert to neutral on error
+      setCurrentEmotion('neutral');
+      setElevenLabsDetectedEmotion('neutral');
+    }
+  };
+
+  const isInitializing = status === 'connecting';
+  const isDisabled = status === 'error' || !!error;
+
+  return (
+    <div className="text-center col-start-6 relative">
+      <div className="flex justify-center mb-4">
+        <button
+          onClick={handleMicClick}
+          disabled={isDisabled}
+          className={`p-6 rounded-full transition-all ${
+            isRecording 
+              ? 'mic-bg-rec' 
+              : 'mic-bg-std'
+          } text-black shadow-lg ${isDisabled ? 'cursor-not-allowed' : ''}`}
+        >
+          {isRecording ? <MicOff size={90} /> : <Mic size={90} />}
+        </button>
+      </div>
+    </div>
+  );
+};
+
+export default VoiceInteraction;

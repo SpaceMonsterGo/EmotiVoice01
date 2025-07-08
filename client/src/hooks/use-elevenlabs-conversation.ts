@@ -1,189 +1,134 @@
-import { useState, useCallback, useRef } from 'react';
-import { useElevenLabsAgent } from '@/lib/elevenlabs';
-
-interface Message {
-  id: string;
-  sender: 'user' | 'ai';
-  content: string;
-  timestamp: number;
-  audioUrl?: string;
-  visemeTimings?: Array<{
-    viseme: number;
-    start: number;
-    end: number;
-  }>;
-}
+import { useState, useCallback } from 'react';
+import { useConversation } from '@elevenlabs/react';
 
 interface ConversationState {
-  isRecording: boolean;
-  isProcessing: boolean;
-  isSpeaking: boolean;
   isConnected: boolean;
+  isRecording: boolean;
+  isSpeaking: boolean;
   error: string | null;
-  messages: Message[];
-  voiceActivity: number;
+  transcript: string;
 }
 
 export function useElevenLabsConversation() {
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const visemeCallback = useRef<((viseme: number) => void) | null>(null);
-  const conversationId = useRef<string | null>(null);
+  const [state, setState] = useState<ConversationState>({
+    isConnected: false,
+    isRecording: false,
+    isSpeaking: false,
+    error: null,
+    transcript: ''
+  });
 
-  // ElevenLabs agent integration
   const {
-    isConnected,
+    status,
+    startSession,
+    endSession,
     isSpeaking,
-    startConversation,
-    stopConversation,
-    getInputVolume,
-    getOutputVolume
-  } = useElevenLabsAgent({
-    onVisemeChange: (viseme: number) => {
-      if (visemeCallback.current) {
-        visemeCallback.current(viseme);
+    transcript
+  } = useConversation({
+    agentId: import.meta.env.ELEVENLABS_AGENT_ID || '',
+    onMessage: async (message) => {
+      console.log('✓ AI message received:', message);
+      const messageText = message.text || message.message || '';
+      
+      if (messageText.trim()) {
+        // Generate visemes for the AI response
+        if (window.visemeCallback) {
+          try {
+            const response = await fetch('/api/elevenlabs/align', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ 
+                text: messageText,
+                voiceId: 'pNInz6obpgDQGcFmaJgB' // Default voice ID
+              })
+            });
+            
+            if (response.ok) {
+              const data = await response.json();
+              console.log('Using ElevenLabs forced alignment with', data.visemes.length, 'visemes');
+              
+              // Play viseme sequence
+              data.visemes.forEach((viseme: any, index: number) => {
+                setTimeout(() => {
+                  window.visemeCallback(viseme.viseme);
+                  console.log(`Viseme ${viseme.viseme} for char '${viseme.char}' at ${viseme.start}ms`);
+                }, viseme.start);
+              });
+              
+              // Reset to neutral after sequence
+              setTimeout(() => {
+                window.visemeCallback(0);
+                console.log('Reset to neutral viseme');
+              }, data.visemes[data.visemes.length - 1]?.end || 2000);
+            }
+          } catch (error) {
+            console.error('Failed to generate visemes:', error);
+          }
+        }
       }
     },
-    onSpeechStart: () => {
-      console.log('ElevenLabs speech started');
+    onAudioStart: () => {
+      console.log('AI started speaking');
+      setState(prev => ({ ...prev, isSpeaking: true }));
     },
-    onSpeechEnd: () => {
-      console.log('ElevenLabs speech ended');
+    onAudioEnd: () => {
+      console.log('AI stopped speaking');
+      setState(prev => ({ ...prev, isSpeaking: false }));
+    },
+    onError: (error) => {
+      console.error('ElevenLabs error:', error);
+      setState(prev => ({ 
+        ...prev, 
+        error: 'Conversation error: ' + error.message,
+        isRecording: false,
+        isConnected: false
+      }));
     }
   });
 
-  // Voice activity detection
-  const voiceActivity = getInputVolume?.() || 0;
-
-  const setVisemeCallback = useCallback((callback: (viseme: number) => void) => {
-    visemeCallback.current = callback;
-  }, []);
-
-  const startRecording = useCallback(async () => {
+  const startConversation = useCallback(async () => {
     try {
-      setError(null);
-      await startConversation();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to start conversation');
+      setState(prev => ({ ...prev, error: null }));
+      await startSession({ agentId: import.meta.env.ELEVENLABS_AGENT_ID || '' });
+      setState(prev => ({ 
+        ...prev, 
+        isRecording: true, 
+        isConnected: true,
+        transcript: ''
+      }));
+    } catch (error) {
+      console.error('Failed to start conversation:', error);
+      setState(prev => ({ 
+        ...prev, 
+        error: 'Failed to start conversation: ' + (error instanceof Error ? error.message : String(error))
+      }));
     }
-  }, [startConversation]);
+  }, [startSession]);
 
-  const stopRecording = useCallback(async () => {
+  const stopConversation = useCallback(async () => {
     try {
-      await stopConversation();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to stop conversation');
+      await endSession();
+      setState(prev => ({ 
+        ...prev, 
+        isRecording: false, 
+        isConnected: false,
+        transcript: transcript || ''
+      }));
+    } catch (error) {
+      console.error('Failed to stop conversation:', error);
+      setState(prev => ({ 
+        ...prev, 
+        error: 'Failed to stop conversation: ' + (error instanceof Error ? error.message : String(error))
+      }));
     }
-  }, [stopConversation]);
-
-  const sendTextMessage = useCallback(async (text: string) => {
-    try {
-      setError(null);
-      setIsProcessing(true);
-      
-      // Add user message
-      const userMessage: Message = {
-        id: Date.now().toString(),
-        sender: 'user',
-        content: text,
-        timestamp: Date.now()
-      };
-      
-      setMessages(prev => [...prev, userMessage]);
-      
-      // Send to ElevenLabs + Gentle processing endpoint
-      const response = await fetch('/api/conversation/process', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: text,
-          conversationId: conversationId.current
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error(`Request failed: ${response.status}`);
-      }
-
-      const data = await response.json();
-      
-      // Add AI message with viseme timings
-      const aiMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        sender: 'ai',
-        content: data.response,
-        timestamp: Date.now(),
-        audioUrl: data.audioUrl,
-        visemeTimings: data.visemeTimings
-      };
-      
-      setMessages(prev => [...prev, aiMessage]);
-      
-      // Play audio with synchronized visemes
-      if (data.audioUrl && data.visemeTimings) {
-        await playAudioWithVisemes(data.audioUrl, data.visemeTimings);
-      }
-      
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to process message');
-    } finally {
-      setIsProcessing(false);
-    }
-  }, []);
-
-  const playAudioWithVisemes = useCallback(async (audioUrl: string, visemeTimings: Array<{viseme: number; start: number; end: number}>) => {
-    const audio = new Audio(audioUrl);
-    
-    return new Promise<void>((resolve, reject) => {
-      audio.onloadeddata = () => {
-        audio.play();
-        
-        // Schedule viseme changes
-        visemeTimings.forEach(({ viseme, start, end }) => {
-          setTimeout(() => {
-            if (visemeCallback.current) {
-              visemeCallback.current(viseme);
-            }
-          }, start * 1000);
-          
-          setTimeout(() => {
-            if (visemeCallback.current) {
-              visemeCallback.current(0); // Reset to neutral
-            }
-          }, end * 1000);
-        });
-      };
-      
-      audio.onended = () => resolve();
-      audio.onerror = (err) => reject(err);
-    });
-  }, []);
-
-  const clearError = useCallback(() => {
-    setError(null);
-  }, []);
-
-  const clearMessages = useCallback(() => {
-    setMessages([]);
-  }, []);
+  }, [endSession, transcript]);
 
   return {
-    // State
-    isRecording: false, // ElevenLabs handles recording internally
-    isProcessing,
-    isSpeaking,
-    isConnected,
-    error,
-    messages,
-    voiceActivity,
-    
-    // Actions
-    startRecording,
-    stopRecording,
-    sendTextMessage,
-    setVisemeCallback,
-    clearError,
-    clearMessages
+    ...state,
+    isSpeaking: isSpeaking || state.isSpeaking,
+    transcript: transcript || state.transcript,
+    status,
+    startConversation,
+    stopConversation
   };
 }

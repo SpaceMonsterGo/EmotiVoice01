@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 import { CharacterDisplay } from "@/components/character-display";
-import { useElevenLabsSimple } from "@/hooks/use-elevenlabs-simple";
+import { useElevenLabsConversation } from "@/hooks/use-elevenlabs-conversation";
 import { Button } from "@/components/ui/button";
 import { Mic, MicOff } from "lucide-react";
 
@@ -8,27 +8,29 @@ export default function Home() {
   // ElevenLabs Simple Conversational AI
   const {
     isConnected,
-    isListening,
+    isRecording,
     isSpeaking,
     error,
+    transcript,
+    status,
     startConversation,
     stopConversation,
-    setVisemeCallback,
-  } = useElevenLabsSimple();
+  } = useElevenLabsConversation();
 
   // Handle viseme callback from character display
   const handleVisemeCallbackReady = useCallback((callback: (viseme: number) => void) => {
-    setVisemeCallback(callback);
-  }, [setVisemeCallback]);
+    // Store the callback globally for the hook to use
+    (window as any).visemeCallback = callback;
+  }, []);
 
   // Handle microphone toggle
   const handleMicrophoneToggle = useCallback(() => {
-    if (isListening) {
+    if (isRecording) {
       stopConversation();
     } else {
       startConversation();
     }
-  }, [isListening, startConversation, stopConversation]);
+  }, [isRecording, startConversation, stopConversation]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 text-white">
@@ -61,7 +63,7 @@ export default function Home() {
             <div className="bg-black/20 backdrop-blur-sm rounded-2xl border border-white/10 p-6">
               <CharacterDisplay
                 isSpeaking={isSpeaking}
-                isListening={isListening}
+                isListening={isRecording}
                 voiceActivity={0}
                 emotionalState="neutral"
                 onVisemeCallbackReady={handleVisemeCallbackReady}
@@ -80,12 +82,12 @@ export default function Home() {
                   onClick={handleMicrophoneToggle}
                   disabled={false}
                   className={`w-20 h-20 rounded-full transition-all duration-300 ${
-                    isListening 
+                    isRecording 
                       ? 'bg-red-500 hover:bg-red-600' 
                       : 'bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600'
                   }`}
                 >
-                  {isListening ? (
+                  {isRecording ? (
                     <MicOff className="w-8 h-8" />
                   ) : (
                     <Mic className="w-8 h-8" />

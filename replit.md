@@ -174,6 +174,13 @@ Changelog:
   - Added volume level debugging to troubleshoot microphone input issues
   - Enhanced microphone settings with echo cancellation and noise suppression
   - Added detailed audio track logging for microphone diagnostics
+- July 07, 2025: Simplified to use official ElevenLabs React SDK:
+  - Replaced complex WebSocket implementation with @elevenlabs/react package
+  - Removed over-engineered audio processing and voice activity detection
+  - Used useConversation hook from official ElevenLabs SDK for reliable microphone handling
+  - Maintained viseme generation through existing forced alignment API
+  - Simplified state management using proven SDK patterns
+  - Fixed microphone issues by leveraging battle-tested ElevenLabs implementation
 
 ## User Preferences
 
