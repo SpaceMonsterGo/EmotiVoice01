@@ -37,7 +37,6 @@ export function useElevenLabsConversation() {
     isSpeaking,
     transcript
   } = useConversation({
-    agentId: config?.agentId || '',
     onMessage: async (message) => {
       console.log('✓ AI message received:', message);
       const messageText = message.text || message.message || '';
@@ -93,6 +92,11 @@ export function useElevenLabsConversation() {
     },
     onError: (error) => {
       console.error('ElevenLabs error:', error);
+      console.error('Error details:', {
+        name: error.name,
+        message: error.message,
+        stack: error.stack
+      });
       setState(prev => ({ 
         ...prev, 
         error: 'Conversation error: ' + error.message,
@@ -110,7 +114,17 @@ export function useElevenLabsConversation() {
       if (!agentId) {
         throw new Error('ElevenLabs Agent ID is not configured on the server');
       }
-      await startSession({ agentId });
+      
+      // Get signed URL from server for proper authentication
+      const signedUrlResponse = await fetch('/api/elevenlabs/signed-url');
+      if (!signedUrlResponse.ok) {
+        throw new Error('Failed to get signed URL from server');
+      }
+      
+      const { signedUrl } = await signedUrlResponse.json();
+      console.log('Using signed URL for WebSocket connection');
+      
+      await startSession({ url: signedUrl });
       setState(prev => ({ 
         ...prev, 
         isRecording: true, 
