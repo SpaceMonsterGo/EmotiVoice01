@@ -58,6 +58,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // API Routes
   
+  // Get ElevenLabs configuration
+  app.get('/api/elevenlabs/config', async (req, res) => {
+    try {
+      const config = {
+        agentId: process.env.ELEVENLABS_AGENT_ID || '',
+        hasApiKey: !!(process.env.ELEVENLABS_API_KEY || ''),
+      };
+      res.json(config);
+    } catch (error) {
+      console.error('Error fetching ElevenLabs config:', error);
+      res.status(500).json({ error: 'Failed to fetch ElevenLabs config' });
+    }
+  });
+
   // Get ElevenLabs signed URL
   app.get('/api/elevenlabs/signed-url', async (req, res) => {
     try {

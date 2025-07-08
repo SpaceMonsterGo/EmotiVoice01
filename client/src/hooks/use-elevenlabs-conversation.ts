@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { useConversation } from '@elevenlabs/react';
+import { useQuery } from '@tanstack/react-query';
 
 interface ConversationState {
   isConnected: boolean;
@@ -7,6 +8,11 @@ interface ConversationState {
   isSpeaking: boolean;
   error: string | null;
   transcript: string;
+}
+
+interface ElevenLabsConfig {
+  agentId: string;
+  hasApiKey: boolean;
 }
 
 export function useElevenLabsConversation() {
@@ -18,6 +24,12 @@ export function useElevenLabsConversation() {
     transcript: ''
   });
 
+  // Get ElevenLabs configuration from server
+  const { data: config } = useQuery<ElevenLabsConfig>({
+    queryKey: ['/api/elevenlabs/config'],
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+
   const {
     status,
     startSession,
@@ -25,7 +37,7 @@ export function useElevenLabsConversation() {
     isSpeaking,
     transcript
   } = useConversation({
-    agentId: import.meta.env.ELEVENLABS_AGENT_ID || '',
+    agentId: config?.agentId || '',
     onMessage: async (message) => {
       console.log('✓ AI message received:', message);
       const messageText = message.text || message.message || '';
@@ -89,8 +101,11 @@ export function useElevenLabsConversation() {
   const startConversation = useCallback(async () => {
     try {
       setState(prev => ({ ...prev, error: null }));
-      const agentId = import.meta.env.ELEVENLABS_AGENT_ID || '';
+      const agentId = config?.agentId || '';
       console.log('Starting conversation with agent ID:', agentId);
+      if (!agentId) {
+        throw new Error('ElevenLabs Agent ID is not configured on the server');
+      }
       await startSession({ agentId });
       setState(prev => ({ 
         ...prev, 
@@ -105,7 +120,7 @@ export function useElevenLabsConversation() {
         error: 'Failed to start conversation: ' + (error instanceof Error ? error.message : String(error))
       }));
     }
-  }, [startSession]);
+  }, [startSession, config]);
 
   const stopConversation = useCallback(async () => {
     try {
