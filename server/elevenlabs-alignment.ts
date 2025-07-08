@@ -128,9 +128,44 @@ export class ElevenLabsAligner {
     });
   }
 
-  // Convert character-level alignment to viseme timestamps
+  // Convert character-level alignment to viseme timestamps with phoneme-based grouping
   convertAlignmentToVisemes(alignment: ElevenLabsAlignment): VisemeTimestamp[] {
     const visemes: VisemeTimestamp[] = [];
+    
+    // Group characters into phoneme-like units
+    const phonemeGroups = this.groupCharactersIntoPhonemes(alignment);
+    
+    for (const group of phonemeGroups) {
+      // Use the dominant viseme for the group
+      const dominantViseme = this.getDominantViseme(group.chars);
+      
+      visemes.push({
+        viseme: dominantViseme,
+        start: group.startTime,
+        end: group.endTime,
+        char: group.chars.join('')
+      });
+    }
+    
+    // Apply smoothing to reduce rapid changes
+    return this.smoothVisemeSequence(visemes);
+  }
+
+  // Group characters into phoneme-like units for more natural timing
+  private groupCharactersIntoPhonemes(alignment: ElevenLabsAlignment): Array<{
+    chars: string[];
+    startTime: number;
+    endTime: number;
+  }> {
+    const groups: Array<{
+      chars: string[];
+      startTime: number;
+      endTime: number;
+    }> = [];
+    
+    let currentGroup: string[] = [];
+    let groupStartTime = 0;
+    let groupEndTime = 0;
     
     for (let i = 0; i < alignment.chars.length; i++) {
       const char = alignment.chars[i];
@@ -138,22 +173,125 @@ export class ElevenLabsAligner {
       const duration = alignment.charDurationsMs[i];
       const endTime = startTime + duration;
       
-      // Skip whitespace
-      if (char === ' ' || char === '\n' || char === '\t') {
+      // Skip whitespace and punctuation
+      if (char === ' ' || char === '\n' || char === '\t' || /[.,!?;:]/.test(char)) {
+        // Finish current group if it exists
+        if (currentGroup.length > 0) {
+          groups.push({
+            chars: currentGroup,
+            startTime: groupStartTime,
+            endTime: groupEndTime
+          });
+          currentGroup = [];
+        }
         continue;
       }
       
-      const viseme = this.charToViseme(char.toLowerCase());
+      // Start new group or continue current one
+      if (currentGroup.length === 0) {
+        groupStartTime = startTime;
+      }
       
-      visemes.push({
-        viseme,
-        start: startTime,
-        end: endTime,
-        char
+      currentGroup.push(char);
+      groupEndTime = endTime;
+      
+      // Break groups at vowel boundaries or after consonant clusters
+      const isVowel = /[aeiouAEIOU]/.test(char);
+      const nextChar = i + 1 < alignment.chars.length ? alignment.chars[i + 1] : '';
+      const nextIsVowel = /[aeiouAEIOU]/.test(nextChar);
+      
+      // End group after vowel + consonant, or after consonant cluster
+      const shouldEndGroup = currentGroup.length >= 2 && (
+        (isVowel && nextChar && !nextIsVowel) || // Vowel followed by consonant
+        (currentGroup.length >= 3) || // Limit group size
+        (nextChar === '' || nextChar === ' ') // End of word
+      );
+      
+      if (shouldEndGroup) {
+        groups.push({
+          chars: currentGroup,
+          startTime: groupStartTime,
+          endTime: groupEndTime
+        });
+        currentGroup = [];
+      }
+    }
+    
+    // Add final group if exists
+    if (currentGroup.length > 0) {
+      groups.push({
+        chars: currentGroup,
+        startTime: groupStartTime,
+        endTime: groupEndTime
       });
     }
     
-    return visemes;
+    return groups;
+  }
+
+  // Get the dominant viseme for a group of characters
+  private getDominantViseme(chars: string[]): number {
+    const visemeCounts: Record<number, number> = {};
+    
+    // Count visemes for each character
+    for (const char of chars) {
+      const viseme = this.charToViseme(char.toLowerCase());
+      visemeCounts[viseme] = (visemeCounts[viseme] || 0) + 1;
+    }
+    
+    // Find the most frequent viseme (excluding neutral)
+    let dominantViseme = 0;
+    let maxCount = 0;
+    
+    for (const [viseme, count] of Object.entries(visemeCounts)) {
+      const visemeNum = parseInt(viseme);
+      if (visemeNum !== 0 && count > maxCount) {
+        maxCount = count;
+        dominantViseme = visemeNum;
+      }
+    }
+    
+    return dominantViseme;
+  }
+
+  // Apply smoothing to reduce rapid viseme changes
+  private smoothVisemeSequence(visemes: VisemeTimestamp[]): VisemeTimestamp[] {
+    if (visemes.length <= 1) return visemes;
+    
+    const smoothed: VisemeTimestamp[] = [];
+    const minDuration = 100; // Minimum 100ms per viseme
+    
+    for (let i = 0; i < visemes.length; i++) {
+      const current = visemes[i];
+      const duration = current.end - current.start;
+      
+      // Skip very short visemes or merge with previous
+      if (duration < minDuration && smoothed.length > 0) {
+        // Extend previous viseme
+        const previous = smoothed[smoothed.length - 1];
+        previous.end = current.end;
+        previous.char += current.char;
+        continue;
+      }
+      
+      // Skip consecutive identical visemes
+      if (smoothed.length > 0 && smoothed[smoothed.length - 1].viseme === current.viseme) {
+        // Extend previous viseme
+        const previous = smoothed[smoothed.length - 1];
+        previous.end = current.end;
+        previous.char += current.char;
+        continue;
+      }
+      
+      smoothed.push({
+        viseme: current.viseme,
+        start: current.start,
+        end: current.end,
+        char: current.char
+      });
+    }
+    
+    return smoothed;
   }
 
   // Convert character to viseme using Rive specification  

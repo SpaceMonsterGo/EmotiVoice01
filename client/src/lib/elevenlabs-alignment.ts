@@ -79,12 +79,12 @@ export function playVisemeSequence(
   const timeouts: NodeJS.Timeout[] = [];
   let startTime = Date.now();
 
-  visemes.forEach((viseme) => {
+  visemes.forEach((viseme, index) => {
     const delay = (viseme.start / speedMultiplier);
     
     const timeout = setTimeout(() => {
       onVisemeChange(viseme.viseme);
-      console.log(`Viseme ${viseme.viseme} for char '${viseme.char}' at ${viseme.start}ms`);
+      console.log(`Viseme ${viseme.viseme} for phoneme '${viseme.char}' at ${viseme.start}ms (duration: ${viseme.end - viseme.start}ms)`);
     }, delay);
     
     timeouts.push(timeout);
@@ -93,7 +93,7 @@ export function playVisemeSequence(
   // Reset to neutral after sequence
   if (visemes.length > 0) {
     const lastViseme = visemes[visemes.length - 1];
-    const resetDelay = (lastViseme.end / speedMultiplier) + 100; // Small buffer
+    const resetDelay = (lastViseme.end / speedMultiplier) + 200; // Longer buffer for natural speech
     
     const resetTimeout = setTimeout(() => {
       onVisemeChange(0); // Neutral

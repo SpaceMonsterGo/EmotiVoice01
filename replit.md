@@ -181,6 +181,14 @@ Changelog:
   - Maintained viseme generation through existing forced alignment API
   - Simplified state management using proven SDK patterns
   - Fixed microphone issues by leveraging battle-tested ElevenLabs implementation
+- July 08, 2025: Fixed viseme timing to use phoneme-based grouping instead of character-based:
+  - Implemented phoneme-like character grouping for natural speech timing
+  - Added viseme smoothing to prevent rapid mouth movement changes
+  - Introduced dominant viseme selection for character groups
+  - Set minimum 100ms duration per viseme for realistic animation
+  - Added consecutive identical viseme merging to reduce redundancy
+  - Enhanced logging to show phoneme duration and timing information
+  - Fixed unnaturally fast lip sync by grouping at vowel/consonant boundaries
 
 ## User Preferences
 
