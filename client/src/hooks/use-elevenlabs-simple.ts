@@ -405,26 +405,33 @@ export function useElevenLabsSimple() {
           for (let i = 0; i < inputBuffer.length; i++) {
             const volume = Math.abs(inputBuffer[i]);
             maxVolume = Math.max(maxVolume, volume);
-            if (volume > 0.01) { // Threshold for voice activity
+            if (volume > 0.001) { // Lower threshold for voice activity
               hasAudio = true;
             }
           }
           
-          // Only send audio if there's actual voice activity
+          // Log volume levels for debugging (every 100th frame to avoid spam)
+          if (Math.random() < 0.01) {
+            console.log('🎤 Current volume level:', maxVolume.toFixed(4), 'hasAudio:', hasAudio);
+          }
+          
+          // Convert float32 to PCM16 format as expected by ElevenLabs
+          const pcm16Buffer = new Int16Array(inputBuffer.length);
+          for (let i = 0; i < inputBuffer.length; i++) {
+            pcm16Buffer[i] = Math.max(-32768, Math.min(32767, inputBuffer[i] * 32768));
+          }
+          
+          // Convert to base64 and send according to ElevenLabs protocol
+          const base64Audio = btoa(String.fromCharCode(...new Uint8Array(pcm16Buffer.buffer)));
+          
+          // Send audio continuously to ElevenLabs (they handle voice activity detection)
+          ws.send(JSON.stringify({
+            user_audio_chunk: base64Audio
+          }));
+          
+          // Only log when we detect voice activity locally
           if (hasAudio) {
-            // Convert float32 to PCM16 format as expected by ElevenLabs
-            const pcm16Buffer = new Int16Array(inputBuffer.length);
-            for (let i = 0; i < inputBuffer.length; i++) {
-              pcm16Buffer[i] = Math.max(-32768, Math.min(32767, inputBuffer[i] * 32768));
-            }
-            
-            // Convert to base64 and send according to ElevenLabs protocol
-            const base64Audio = btoa(String.fromCharCode(...new Uint8Array(pcm16Buffer.buffer)));
-            
-            console.log('Sending audio chunk, volume:', maxVolume.toFixed(4), 'size:', base64Audio.length);
-            ws.send(JSON.stringify({
-              user_audio_chunk: base64Audio
-            }));
+            console.log('🗣️ Voice detected, volume:', maxVolume.toFixed(4), 'chunk size:', base64Audio.length);
           }
         }
       };

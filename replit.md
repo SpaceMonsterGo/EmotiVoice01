@@ -168,6 +168,12 @@ Changelog:
   - Reverted to ScriptProcessorNode temporarily as MediaRecorder doesn't provide required PCM16 format
   - Enhanced conversation state management to prevent timeouts after first message
   - Added proper state transitions for user transcript and agent response events
+- July 07, 2025: Fixed microphone audio processing and voice activity detection:
+  - Lowered voice activity threshold from 0.01 to 0.001 for better sensitivity
+  - Changed to continuous audio streaming (ElevenLabs handles voice activity detection)
+  - Added volume level debugging to troubleshoot microphone input issues
+  - Enhanced microphone settings with echo cancellation and noise suppression
+  - Added detailed audio track logging for microphone diagnostics
 
 ## User Preferences
 
