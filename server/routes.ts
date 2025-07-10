@@ -279,33 +279,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // ElevenLabs forced alignment endpoint
+  // Performance-optimized ElevenLabs forced alignment endpoint
+  const alignmentCache = new Map<string, any>();
+  const MAX_CACHE_SIZE = 100;
+  
   app.post('/api/elevenlabs/align', async (req, res) => {
+    const startTime = Date.now();
     try {
       const { text, voiceId } = req.body;
       
-      if (!text || !voiceId) {
-        return res.status(400).json({ error: 'Text and voiceId are required' });
+      if (!text || typeof text !== 'string') {
+        return res.status(400).json({ error: 'Text is required' });
+      }
+
+      // Use default voice if not provided
+      const actualVoiceId = voiceId || 'pNInz6obpgDQGcFmaJgB';
+      
+      // Create cache key for AI responses only
+      const cacheKey = `${text.trim()}-${actualVoiceId}`;
+      
+      // Check cache first for performance optimization
+      if (alignmentCache.has(cacheKey)) {
+        console.log(`Alignment cache hit (${Date.now() - startTime}ms)`);
+        return res.json(alignmentCache.get(cacheKey));
       }
 
       const { elevenLabsAligner } = await import('./elevenlabs-alignment.js');
       
       // Get alignment data from ElevenLabs
-      const alignmentResult = await elevenLabsAligner.getAlignmentData(text, voiceId);
+      const alignmentResult = await elevenLabsAligner.getAlignmentData(text, actualVoiceId);
       
       if (!alignmentResult) {
         return res.status(500).json({ error: 'Failed to get alignment data' });
       }
 
-      // Convert to viseme timestamps
+      // Convert to viseme timestamps with phoneme-based grouping
       const visemes = elevenLabsAligner.convertAlignmentToVisemes(alignmentResult.normalizedAlignment);
       
-      res.json({
+      const result = {
         visemes,
         alignment: alignmentResult.alignment,
         normalizedAlignment: alignmentResult.normalizedAlignment,
         audioDuration: alignmentResult.audio.length / (16000 * 2) // Assuming 16kHz 16-bit audio
-      });
+      };
+
+      // Cache the result for future requests
+      if (alignmentCache.size >= MAX_CACHE_SIZE) {
+        // Remove oldest entry to prevent memory leaks
+        const firstKey = alignmentCache.keys().next().value;
+        alignmentCache.delete(firstKey);
+      }
+      alignmentCache.set(cacheKey, result);
+
+      console.log(`AI alignment processing completed in ${Date.now() - startTime}ms (${visemes.length} phoneme-based visemes)`);
+      res.json(result);
     } catch (error) {
       console.error('Error in forced alignment:', error);
       res.status(500).json({ error: 'Forced alignment failed' });

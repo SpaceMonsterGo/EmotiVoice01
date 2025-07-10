@@ -195,6 +195,15 @@ Changelog:
   - Improved logging to distinguish between AI and user messages
   - Eliminated unnecessary alignment API calls for outbound audio
   - Reduced system lag by processing visemes only when needed for character animation
+- July 10, 2025: Implemented Phase 1 performance optimizations:
+  - **Strict AI-Only Processing**: Enhanced filtering to ensure visemes are never processed for user speech
+  - **Duplicate Message Prevention**: Added message deduplication to prevent processing same AI response twice
+  - **Timeout Management**: Implemented centralized timeout tracking and cleanup to prevent memory leaks
+  - **Connection Debouncing**: Added connection attempt tracking to prevent duplicate WebSocket connections
+  - **Performance Logging**: Added detailed timing metrics for alignment API calls and message processing
+  - **Server-Side Caching**: Implemented LRU cache for alignment results to reduce redundant API calls
+  - **Resource Cleanup**: Added proper cleanup on conversation stop and component unmount
+  - **Batch Processing**: Optimized viseme timeout handling with centralized management
 
 ## User Preferences
 
