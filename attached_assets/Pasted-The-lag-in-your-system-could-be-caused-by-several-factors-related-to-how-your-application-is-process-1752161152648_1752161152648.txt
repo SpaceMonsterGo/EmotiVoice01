@@ -1,0 +1,38 @@
+The lag in your system could be caused by several factors related to how your application is processing audio and visemes, as well as potential bottlenecks in your WebSocket connections. Here are a few areas to investigate:
+
+WebSocket Latency: Check the latency of your WebSocket connection to the Eleven Labs service. Network latency can contribute to the overall lag. Ensure you are using a reliable network connection.
+
+Audio Processing Delay: If the audio streaming and processing take too long, this can lead to delays. Optimize how audio data is sent and received by minimizing data size and using efficient encoding.
+
+Viseme Timing and Generation: Examine the implementation in your generatePreciseVisemes function in use-elevenlabs-voice-agent.ts. If you are facing delays in the timing for visumes, this can be addressed by checking the performance of the fetch request to your /api/elevenlabs/align endpoint and how quickly it responds.
+
+Server Performance: The performance of your Node.js server can also contribute to lag. Consider checking if your server can handle concurrent requests efficiently. You may want to implement logging to analyze response times for different endpoints.
+
+Real-Time Processing Optimization: It looks like you're currently processing visemes and responses in real-time. To reduce lag, ensure that you are only processing responses that are necessary and can limit functionality to only the audio responses from Eleven Labs.
+
+Browser Performance: The client-side performance might be impacted by heavy operations running on the main thread. Ensure any audio analysis/processing is performed optimally.
+
+Microphone Settings: Since you have implemented microphone settings, verify that they’re optimized. Echo cancellation and noise suppression can add processing time.
+
+For example, check how you're managing viseme timeouts in your code:
+
+const disconnect = useCallback(() => {
+  if (websocketRef.current) {
+    websocketRef.current.close();
+    websocketRef.current = null;
+  }
+  // Clear all viseme timeouts
+  currentVisemeTimeouts.current.forEach(timeout => clearTimeout(timeout));
+  currentVisemeTimeouts.current = [];
+  stopRecording();
+  isSpeakingRef.current = false;
+  setState(prev => ({ 
+    ...prev, 
+    isConnected: false, 
+    isRecording: false, 
+    isSpeaking: false 
+  }));
+}, [stopRecording]);
+Here, ensuring you're not holding onto too many timeouts or redundant connections can help optimize performance.
+
+With these insights in mind, you should be able to identify where the issues are coming from and take steps to address them. Implementing logging may provide insights into which part of the process is causing significant lag. If you find that the server's capacity is being maxed out, consider configuring autoscaling to better handle fluctuating loads.
