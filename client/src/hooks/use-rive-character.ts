@@ -1,5 +1,4 @@
-import { useEffect, useState, useCallback, RefObject, useMemo } from "react";
-import { VisemeService, VisemeEvent } from "../services/visemeService";
+import { useEffect, useState, useCallback, RefObject } from "react";
 
 interface RiveState {
   Neutral: number;
@@ -35,8 +34,6 @@ export function useRiveCharacter(containerRef: RefObject<HTMLDivElement>) {
     voiceActivity: 0,
   });
   const [stateMachine, setStateMachine] = useState<any>(null);
-
-  const visemeService = useMemo(() => new VisemeService(), []);
 
   useEffect(() => {
     let riveInstance: any = null;
@@ -82,7 +79,7 @@ export function useRiveCharacter(containerRef: RefObject<HTMLDivElement>) {
         containerRef.current.removeChild(canvas);
       }
     };
-  }, [containerRef, visemeService]);
+  }, [containerRef]);
 
   const setRiveState = useCallback((key: keyof RiveState, value: any) => {
     setRiveStateInternal(prev => ({ ...prev, [key]: value } as RiveState));
@@ -97,27 +94,21 @@ export function useRiveCharacter(containerRef: RefObject<HTMLDivElement>) {
 
   const playVisemeSequence = async (text: string) => {
     if (!stateMachine) return;
+    
     // Reset all viseme inputs to 0
     (['Neutral','F','M','O','U','E','AI','CH','S','L'] as (keyof RiveState)[])  
       .forEach(k => setRiveState(k, k === 'Neutral' ? 100 : 0));
 
-    try {
-      const events: VisemeEvent[] = await visemeService.generateVisemes(text);
-      events.forEach(({ time, viseme }) => {
-        setTimeout(() => {
-          (['Neutral','F','M','O','U','E','AI','CH','S','L'] as (keyof RiveState)[])   
-            .forEach(k => setRiveState(k, 0));
-          setRiveState(viseme as keyof RiveState, 100);
-        }, time);
-      });
-      const last = Math.max(...events.map(e => e.time));
-      setTimeout(() => {
-        (['Neutral','F','M','O','U','E','AI','CH','S','L'] as (keyof RiveState)[])  
-          .forEach(k => setRiveState(k, k === 'Neutral' ? 100 : 0));
-      }, last + 500);
-    } catch (err) {
-      console.error('Viseme play error:', err);
-    }
+    // Simple viseme generation based on text characters
+    // This is a basic implementation - the real viseme data comes from ElevenLabs
+    console.log('Playing viseme sequence for text:', text);
+    
+    // For now, just animate the mouth opening and closing for speaking
+    setRiveState('isTyping', true);
+    setTimeout(() => {
+      setRiveState('isTyping', false);
+      setRiveState('Neutral', 100);
+    }, text.length * 50); // Rough timing based on text length
   };
 
   return { canvas, riveState, setRiveState, playVisemeSequence };
