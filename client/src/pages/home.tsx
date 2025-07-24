@@ -12,6 +12,7 @@ export default function Home() {
     isSpeaking,
     error,
     transcript,
+    emotionalState,
     status,
     startConversation,
     stopConversation,
@@ -66,7 +67,7 @@ export default function Home() {
                 isSpeaking={isSpeaking}
                 isListening={isRecording}
                 voiceActivity={0}
-                emotionalState="neutral"
+                emotionalState={emotionalState}
                 onVisemeCallbackReady={handleVisemeCallbackReady}
               />
             </div>

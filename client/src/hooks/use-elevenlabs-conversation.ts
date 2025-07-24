@@ -24,6 +24,9 @@ export function useElevenLabsConversation() {
     transcript: ''
   });
 
+  // Add emotional state tracking
+  const [emotionalState, setEmotionalState] = useState<string>('neutral');
+
   // Performance optimization: Track timeouts and connection state
   const visemeTimeoutsRef = useRef<Set<NodeJS.Timeout>>(new Set());
   const connectionAttemptRef = useRef<boolean>(false);
@@ -39,17 +42,29 @@ export function useElevenLabsConversation() {
     status,
     startSession,
     endSession,
-    isSpeaking,
-    transcript
+    isSpeaking
   } = useConversation({
     agentId: config?.agentId || '',
+    clientTools: {
+      emotion_detector: async ({ emotion }: { emotion: string }) => {
+        console.log(`Emotion detected: ${emotion}`);
+        setEmotionalState(emotion);
+        
+        // Also update the global emotion callback if available
+        if ((window as any).emotionCallback) {
+          (window as any).emotionCallback(emotion);
+        }
+        
+        return { success: true, emotion };
+      }
+    },
     onMessage: async (message) => {
       const startTime = performance.now();
       console.log('✓ AI message received:', message);
-      const messageText = message.text || message.message || '';
+      const messageText = typeof message === 'string' ? message : (message as any).message || '';
       
       // STRICT FILTERING: Only process AI messages for visemes, never user input
-      if (messageText.trim() && message.source === 'ai') {
+      if (messageText.trim() && (message as any).source === 'ai') {
         // Prevent duplicate processing of the same message
         if (lastProcessedMessageRef.current === messageText) {
           console.log('Skipping duplicate AI message processing');
@@ -61,7 +76,7 @@ export function useElevenLabsConversation() {
         clearAllVisemeTimeouts();
         
         // Generate visemes ONLY for AI responses using ElevenLabs alignment
-        if (window.visemeCallback) {
+        if ((window as any).visemeCallback) {
           try {
             const fetchStart = performance.now();
             const response = await fetch('/api/elevenlabs/align', {
@@ -81,7 +96,7 @@ export function useElevenLabsConversation() {
               // Play viseme sequence with timeout tracking
               data.visemes.forEach((viseme: any, index: number) => {
                 const timeout = setTimeout(() => {
-                  window.visemeCallback(viseme.viseme);
+                  (window as any).visemeCallback(viseme.viseme);
                   console.log(`Viseme ${viseme.viseme} for phoneme '${viseme.char}' at ${viseme.start}ms (duration: ${viseme.end - viseme.start}ms)`);
                 }, viseme.start);
                 visemeTimeoutsRef.current.add(timeout);
@@ -89,7 +104,7 @@ export function useElevenLabsConversation() {
               
               // Reset to neutral after sequence
               const resetTimeout = setTimeout(() => {
-                window.visemeCallback(0);
+                (window as any).visemeCallback(0);
                 console.log('Reset to neutral viseme');
               }, data.visemes[data.visemes.length - 1]?.end + 200 || 2000);
               visemeTimeoutsRef.current.add(resetTimeout);
@@ -98,12 +113,12 @@ export function useElevenLabsConversation() {
             console.error('Failed to generate visemes:', error);
           }
         }
-      } else if (message.source === 'user') {
+      } else if ((message as any).source === 'user') {
         // For user messages, NEVER process visemes - just log
         console.log('User transcript (no visemes processed):', messageText);
       } else {
         // Log any other message types without processing
-        console.log('Other message type (no visemes):', { source: message.source, text: messageText });
+        console.log('Other message type (no visemes):', { source: (message as any).source, text: messageText });
       }
       
       const endTime = performance.now();
@@ -181,8 +196,8 @@ export function useElevenLabsConversation() {
       connectionAttemptRef.current = false;
       
       // Reset character to neutral immediately
-      if (window.visemeCallback) {
-        window.visemeCallback(0);
+      if ((window as any).visemeCallback) {
+        (window as any).visemeCallback(0);
       }
       
       await endSession();
@@ -190,7 +205,7 @@ export function useElevenLabsConversation() {
         ...prev, 
         isRecording: false, 
         isConnected: false,
-        transcript: transcript || ''
+        transcript: state.transcript
       }));
       console.log('Conversation stopped and resources cleaned up');
     } catch (error) {
@@ -200,7 +215,7 @@ export function useElevenLabsConversation() {
         error: 'Failed to stop conversation: ' + (error instanceof Error ? error.message : String(error))
       }));
     }
-  }, [endSession, transcript, clearAllVisemeTimeouts]);
+  }, [endSession, clearAllVisemeTimeouts]);
 
   const clearError = useCallback(() => {
     setState(prev => ({ ...prev, error: null }));
@@ -217,7 +232,8 @@ export function useElevenLabsConversation() {
   return {
     ...state,
     isSpeaking: isSpeaking || state.isSpeaking,
-    transcript: transcript || state.transcript,
+    transcript: state.transcript,
+    emotionalState,
     status,
     startConversation,
     stopConversation,
